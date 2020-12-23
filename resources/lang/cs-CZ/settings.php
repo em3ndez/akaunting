@@ -29,6 +29,12 @@ return [
             'before'        => 'Před číslem',
             'after'         => 'Za číslem',
         ],
+        'discount_location' => [
+            'name'          => 'Umístění slevy',
+            'item'          => 'Na řádku',
+            'total'         => 'Celkem',
+            'both'          => 'Řádek i celkem',
+        ],
     ],
 
     'invoice' => [
@@ -52,6 +58,10 @@ return [
         'subheading'        => 'Podtitul',
         'due_receipt'       => 'Termín dle účtenky',
         'due_days'          => 'Termín do :days',
+        'choose_template'   => 'Zvolte šablonu faktury',
+        'default'           => 'Výchozí',
+        'classic'           => 'Klasické',
+        'modern'            => 'Moderní',
     ],
 
     'default' => [
