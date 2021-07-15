@@ -44,7 +44,6 @@ mix
     .js('resources/assets/js/views/common/imports.js', 'public/js/common')
     .js('resources/assets/js/views/common/items.js', 'public/js/common')
     .js('resources/assets/js/views/common/reports.js', 'public/js/common')
-    .js('resources/assets/js/views/common/search.js', 'public/js/common')
 
     // Sales
     .js('resources/assets/js/views/sales/revenues.js', 'public/js/sales')
@@ -57,6 +56,9 @@ mix
     // Install
     .js('resources/assets/js/install.js', 'public/js')
     .js('resources/assets/js/views/install/update.js', 'public/js/install')
+
+    //Wizard
+    .js('resources/assets/js/wizard.js', 'public/js/wizard')
 
     // Modules
     .js('resources/assets/js/views/modules/item.js', 'public/js/modules')
@@ -74,11 +76,5 @@ mix
     .js('resources/assets/js/views/settings/modules.js', 'public/js/settings')
     .js('resources/assets/js/views/settings/settings.js', 'public/js/settings')
     .js('resources/assets/js/views/settings/taxes.js', 'public/js/settings')
-
-    // Wizard
-    .js('resources/assets/js/views/wizard/company.js', 'public/js/wizard')
-    .js('resources/assets/js/views/wizard/currencies.js', 'public/js/wizard')
-    .js('resources/assets/js/views/wizard/taxes.js', 'public/js/wizard')
-    .js('resources/assets/js/views/wizard/finish.js', 'public/js/wizard')
 
     .sass('resources/assets/sass/argon.scss', 'public/css');

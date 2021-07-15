@@ -7,15 +7,17 @@
             @stack('body_start')
 
             <div id="app">
+                <div class="card-body">
 
-                @include('partials.wizard.content')
+                    @include('flash::message')
 
+                    @yield('content')
+                </div>
             </div>
 
-            @stack('body_end')
         </div>
 
         @include('partials.wizard.scripts')
-    </body>
 
+    </body>
 </html>

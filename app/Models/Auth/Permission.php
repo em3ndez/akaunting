@@ -15,8 +15,6 @@ class Permission extends LaratrustPermission
 
     protected $table = 'permissions';
 
-    protected $tenantable = false;
-
     /**
      * The accessors to append to the model's array form.
      *
@@ -44,7 +42,7 @@ class Permission extends LaratrustPermission
         $request = request();
 
         $search = $request->get('search');
-        $limit = $request->get('limit', setting('default.list_limit', '25'));
+        $limit = (int) $request->get('limit', setting('default.list_limit', '25'));
 
         return $query->usingSearchString($search)->sortable($sort)->paginate($limit);
     }

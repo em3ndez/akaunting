@@ -76,7 +76,7 @@ class Customers extends Controller
         }
 
         // Handle transactions
-        $transactions = Transaction::with('category')->where('contact_id', $customer->id)->income()->get();
+        $transactions = Transaction::with('account', 'category')->where('contact_id', $customer->id)->income()->get();
 
         $counts['transactions'] = $transactions->count();
 
@@ -85,7 +85,7 @@ class Customers extends Controller
             $amounts['paid'] += $item->getAmountConvertedToDefault();
         });
 
-        $limit = request('limit', setting('default.list_limit', '25'));
+        $limit = (int) request('limit', setting('default.list_limit', '25'));
         $transactions = $this->paginate($transactions->sortByDesc('paid_at'), $limit);
         $invoices = $this->paginate($invoices->sortByDesc('issued_at'), $limit);
 
@@ -289,59 +289,17 @@ class Customers extends Controller
         return $this->exportExcel(new Export, trans_choice('general.customers', 2));
     }
 
-    public function currency(Contact $customer)
+    public function createInvoice(Contact $customer)
     {
-        if (empty($customer)) {
-            return response()->json([]);
-        }
+        $data['contact'] = $customer;
 
-        $currency_code = setting('default.currency');
-
-        if (isset($customer->currency_code)) {
-            $currencies = Currency::enabled()->pluck('name', 'code')->toArray();
-
-            if (array_key_exists($customer->currency_code, $currencies)) {
-                $currency_code = $customer->currency_code;
-            }
-        }
-
-        // Get currency object
-        $currency = Currency::where('code', $currency_code)->first();
-
-        $customer->currency_name = $currency->name;
-        $customer->currency_code = $currency_code;
-        $customer->currency_rate = $currency->rate;
-
-        $customer->thousands_separator = $currency->thousands_separator;
-        $customer->decimal_mark = $currency->decimal_mark;
-        $customer->precision = (int) $currency->precision;
-        $customer->symbol_first = $currency->symbol_first;
-        $customer->symbol = $currency->symbol;
-
-        return response()->json($customer);
+        return redirect()->route('invoices.create')->withInput($data);
     }
 
-    public function field(BaseRequest $request)
+    public function createRevenue(Contact $customer)
     {
-        $html = '';
+        $data['contact'] = $customer;
 
-        if ($request['fields']) {
-            foreach ($request['fields'] as $field) {
-                switch ($field) {
-                    case 'password':
-                        $html .= \Form::passwordGroup('password', trans('auth.password.current'), 'key', [], 'col-md-6 password');
-                        break;
-                    case 'password_confirmation':
-                        $html .= \Form::passwordGroup('password_confirmation', trans('auth.password.current_confirm'), 'key', [], 'col-md-6 password');
-                        break;
-                }
-            }
-        }
-
-        $json = [
-            'html' => $html
-        ];
-
-        return response()->json($json);
+        return redirect()->route('revenues.create')->withInput($data);
     }
 }

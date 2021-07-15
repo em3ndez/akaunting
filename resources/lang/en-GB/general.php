@@ -51,6 +51,7 @@ return [
     'templates'             => 'Template|Templates',
     'sales'                 => 'Sale|Sales',
     'purchases'             => 'Purchase|Purchases',
+    'notifications'         => 'Notification|Notifications',
 
     'welcome'               => 'Welcome',
     'banking'               => 'Banking',
@@ -160,6 +161,8 @@ return [
     'recurring_and_more'    => 'Recurring and more..',
     'due_on'                => 'Due on',
     'amount_due'            => 'Amount due',
+    'financial_year'        => 'Financial Year',
+    'created'               => 'Created',
 
     'card' => [
         'cards'                 => 'Card|Cards',

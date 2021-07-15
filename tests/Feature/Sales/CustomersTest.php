@@ -20,6 +20,18 @@ class CustomersTest extends FeatureTestCase
             ->assertSeeText(trans_choice('general.customers', 2));
     }
 
+    public function testItShouldSeeCustomerShowPage()
+    {
+        $request = $this->getRequest();
+
+        $customer = $this->dispatch(new CreateContact($request));
+
+        $this->loginAs()
+            ->get(route('customers.show', $customer->id))
+            ->assertStatus(200)
+            ->assertSee($customer->email);
+    }
+
     public function testItShouldSeeCustomerCreatePage()
     {
         $this->loginAs()
@@ -122,8 +134,8 @@ class CustomersTest extends FeatureTestCase
 
     public function testItShouldExportCustomers()
     {
-        $count = 5;
-        Contact::factory()->customer()->count($count)->create();
+        Contact::factory()->customer()->count(5)->create();
+        $count = Contact::count();
 
         \Excel::fake();
 
@@ -131,33 +143,39 @@ class CustomersTest extends FeatureTestCase
             ->get(route('customers.export'))
             ->assertStatus(200);
 
+        \Excel::matchByRegex();
+
         \Excel::assertDownloaded(
-            \Str::filename(trans_choice('general.customers', 2)) . '.xlsx',
+            '/' . \Str::filename(trans_choice('general.customers', 2)) . '-\d{10}\.xlsx/',
             function (Export $export) use ($count) {
                 // Assert that the correct export is downloaded.
-                return $export->collection()->count() === $count + 1;
+                return $export->collection()->count() === $count;
             }
         );
     }
 
     public function testItShouldExportSelectedCustomers()
     {
-        $count = 5;
-        $customers = Contact::factory()->customer()->count($count)->create();
+        $create_count = 5;
+        $select_count = 3;
+
+        $customers = Contact::factory()->customer()->count($create_count)->create();
 
         \Excel::fake();
 
         $this->loginAs()
             ->post(
                 route('bulk-actions.action', ['group' => 'sales', 'type' => 'customers']),
-                ['handle' => 'export', 'selected' => [$customers->random()->id]]
+                ['handle' => 'export', 'selected' => $customers->take($select_count)->pluck('id')->toArray()]
             )
             ->assertStatus(200);
 
+        \Excel::matchByRegex();
+
         \Excel::assertDownloaded(
-            \Str::filename(trans_choice('general.customers', 2)) . '.xlsx',
-            function (Export $export) {
-                return $export->collection()->count() === 1;
+            '/' . \Str::filename(trans_choice('general.customers', 2)) . '-\d{10}\.xlsx/',
+            function (Export $export) use ($select_count) {
+                return $export->collection()->count() === $select_count;
             }
         );
     }

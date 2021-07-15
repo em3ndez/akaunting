@@ -47,7 +47,7 @@ class Bills extends BulkAction
     {
         $bills = $this->getSelectedRecords($request);
 
-        foreach ($bills as $bill) {// Already in transactions
+        foreach ($bills as $bill) {
             if ($bill->status == 'paid') {
                 continue;
             }
@@ -61,6 +61,10 @@ class Bills extends BulkAction
         $bills = $this->getSelectedRecords($request);
 
         foreach ($bills as $bill) {
+            if ($bill->status == 'received') {
+                continue;
+            }
+
             event(new DocumentReceived($bill));
         }
     }
@@ -70,6 +74,10 @@ class Bills extends BulkAction
         $bills = $this->getSelectedRecords($request);
 
         foreach ($bills as $bill) {
+            if ($bill->status == 'cancelled') {
+                continue;
+            }
+
             event(new DocumentCancelled($bill));
         }
     }
@@ -89,7 +97,9 @@ class Bills extends BulkAction
 
     public function destroy($request)
     {
-        $bills = $this->getSelectedRecords($request);
+        $bills = $this->getSelectedRecords($request, [
+            'items', 'item_taxes', 'histories', 'transactions', 'recurring', 'totals'
+        ]);
 
         foreach ($bills as $bill) {
             try {
@@ -104,6 +114,6 @@ class Bills extends BulkAction
     {
         $selected = $this->getSelectedInput($request);
 
-        return \Excel::download(new Export($selected), \Str::filename(trans_choice('general.bills', 2)) . '.xlsx');
+        return $this->exportExcel(new Export($selected), trans_choice('general.bills', 2));
     }
 }

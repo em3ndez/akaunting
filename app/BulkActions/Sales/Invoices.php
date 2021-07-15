@@ -48,7 +48,6 @@ class Invoices extends BulkAction
         $invoices = $this->getSelectedRecords($request);
 
         foreach ($invoices as $invoice) {
-            // Already in transactions
             if ($invoice->status == 'paid') {
                 continue;
             }
@@ -62,6 +61,10 @@ class Invoices extends BulkAction
         $invoices = $this->getSelectedRecords($request);
 
         foreach ($invoices as $invoice) {
+            if ($invoice->status == 'sent') {
+                continue;
+            }
+
             event(new DocumentSent($invoice));
         }
     }
@@ -71,6 +74,10 @@ class Invoices extends BulkAction
         $invoices = $this->getSelectedRecords($request);
 
         foreach ($invoices as $invoice) {
+            if ($invoice->status == 'cancelled') {
+                continue;
+            }
+
             event(new DocumentCancelled($invoice));
         }
     }
@@ -86,14 +93,11 @@ class Invoices extends BulkAction
         }
     }
 
-    public function delete($request)
-    {
-        $this->destroy($request);
-    }
-
     public function destroy($request)
     {
-        $invoices = $this->getSelectedRecords($request);
+        $invoices = $this->getSelectedRecords($request, [
+            'items', 'item_taxes', 'histories', 'transactions', 'recurring', 'totals'
+        ]);
 
         foreach ($invoices as $invoice) {
             try {
@@ -108,6 +112,6 @@ class Invoices extends BulkAction
     {
         $selected = $this->getSelectedInput($request);
 
-        return \Excel::download(new Export($selected), \Str::filename(trans_choice('general.invoices', 2)) . '.xlsx');
+        return $this->exportExcel(new Export($selected), trans_choice('general.invoices', 2));
     }
 }

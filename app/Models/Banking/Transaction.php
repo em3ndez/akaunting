@@ -28,7 +28,23 @@ class Transaction extends Model
      *
      * @var array
      */
-    protected $fillable = ['company_id', 'type', 'account_id', 'paid_at', 'amount', 'currency_code', 'currency_rate', 'document_id', 'contact_id', 'description', 'category_id', 'payment_method', 'reference', 'parent_id'];
+    protected $fillable = [
+        'company_id',
+        'type',
+        'account_id',
+        'paid_at',
+        'amount',
+        'currency_code',
+        'currency_rate',
+        'document_id',
+        'contact_id',
+        'description',
+        'category_id',
+        'payment_method',
+        'reference',
+        'parent_id',
+        'created_by',
+    ];
 
     /**
      * The attributes that should be cast.
@@ -355,11 +371,11 @@ class Transaction extends Model
         }
 
         if ($this->isIncome()) {
-            return !empty($this->document_id) ? 'invoices.show' : 'revenues.edit';
+            return !empty($this->document_id) ? 'invoices.show' : 'revenues.show';
         }
 
         if ($this->isExpense()) {
-            return !empty($this->document_id) ? 'bills.show' : 'payments.edit';
+            return !empty($this->document_id) ? 'bills.show' : 'payments.show';
         }
 
         return 'transactions.index';
@@ -373,6 +389,12 @@ class Transaction extends Model
     public function getRouteIdAttribute($value)
     {
         return !empty($value) ? $value : (!empty($this->document_id) ? $this->document_id : $this->id);
+    }
+
+    public function getTemplatePathAttribute($value = null)
+    {
+        $type_for_theme = ($this->type == 'income') ? 'sales.revenues.print_default' : 'purchases.payments.print_default';
+        return $value ?: $type_for_theme;
     }
 
     /**

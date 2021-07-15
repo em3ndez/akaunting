@@ -4,10 +4,13 @@ namespace App\Notifications\Portal;
 
 use App\Abstracts\Notification;
 use App\Models\Common\EmailTemplate;
+use App\Traits\Documents;
 use Illuminate\Support\Facades\URL;
 
 class PaymentReceived extends Notification
 {
+    use Documents;
+
     /**
      * The bill model.
      *
@@ -30,17 +33,28 @@ class PaymentReceived extends Notification
     public $template;
 
     /**
+     * Should attach pdf or not.
+     *
+     * @var bool
+     */
+    public $attach_pdf;
+
+    /**
      * Create a notification instance.
      *
      * @param  object  $invoice
+     * @param  object  $transaction
+     * @param  object  $template_alias
+     * @param  object  $attach_pdf
      */
-    public function __construct($invoice = null, $transaction = null, $template = null)
+    public function __construct($invoice = null, $transaction = null, $template_alias = null, $attach_pdf = false)
     {
         parent::__construct();
 
         $this->invoice = $invoice;
         $this->transaction = $transaction;
-        $this->template = EmailTemplate::alias($template)->first();
+        $this->template = EmailTemplate::alias($template_alias)->first();
+        $this->attach_pdf = $attach_pdf;
     }
 
     /**
@@ -53,9 +67,9 @@ class PaymentReceived extends Notification
     {
         $message = $this->initMessage();
 
-        // Attach the PDF file if available
-        if (isset($this->invoice->pdf_path)) {
-            $message->attach($this->invoice->pdf_path, [
+        // Attach the PDF file
+        if ($this->attach_pdf) {
+            $message->attach($this->storeDocumentPdfAndGetPath($this->invoice), [
                 'mime' => 'application/pdf',
             ]);
         }
@@ -72,8 +86,14 @@ class PaymentReceived extends Notification
     public function toArray($notifiable)
     {
         return [
+            'template_alias' => $this->template->alias,
             'invoice_id' => $this->invoice->id,
+            'invoice_number' => $this->invoice->document_number,
+            'customer_name' => $this->invoice->contact_name,
             'amount' => $this->invoice->amount,
+            'invoice_at' => $this->invoice->issued_at,
+            'due_at' => $this->invoice->due_at,
+            'status' => $this->invoice->status,
         ];
     }
 

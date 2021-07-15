@@ -26,7 +26,9 @@ class Transfers extends BulkAction
 
     public function destroy($request)
     {
-        $transfers = $this->getSelectedRecords($request);
+        $transfers = $this->getSelectedRecords($request, [
+            'expense_transaction', 'income_transaction'
+        ]);
 
         foreach ($transfers as $transfer) {
             try {
@@ -41,6 +43,6 @@ class Transfers extends BulkAction
     {
         $selected = $this->getSelectedInput($request);
 
-        return \Excel::download(new Export($selected), \Str::filename(trans_choice('general.transfers', 2)) . '.xlsx');
+        return $this->exportExcel(new Export($selected), trans_choice('general.transfers', 2));
     }
 }

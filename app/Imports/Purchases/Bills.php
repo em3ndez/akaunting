@@ -2,19 +2,16 @@
 
 namespace App\Imports\Purchases;
 
+use App\Abstracts\ImportMultipleSheets;
 use App\Imports\Purchases\Sheets\Bills as Base;
 use App\Imports\Purchases\Sheets\BillItems;
 use App\Imports\Purchases\Sheets\BillItemTaxes;
 use App\Imports\Purchases\Sheets\BillHistories;
 use App\Imports\Purchases\Sheets\BillTotals;
 use App\Imports\Purchases\Sheets\BillTransactions;
-use Maatwebsite\Excel\Concerns\Importable;
-use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
-class Bills implements WithMultipleSheets
+class Bills extends ImportMultipleSheets
 {
-    use Importable;
-
     public function sheets(): array
     {
         return [

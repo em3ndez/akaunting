@@ -9,6 +9,14 @@
     font-style: normal;
 }
 
+body {
+    height: 100%;
+}
+
+.datepicker[readonly] {
+    background-color: transparent !important;
+}
+
 /*--Layout Content--*/
 .content-layout {
     max-width: 1300px !important;
@@ -211,6 +219,22 @@ button:focus {
 /*--------Max Width 100 Pixel--------*/
 .mwpx-100 {
     max-width: 100px !important;
+}
+
+.mwpx-200 {
+    max-width: 200px !important;
+}
+
+.mwpx-300 {
+    max-width: 300px !important;
+}
+
+.mwpx-400 {
+    max-width: 400px !important;
+}
+
+.mwpx-500 {
+    max-width: 500px !important;
 }
 /*--------Max Width 100 Pixel Finish--------*/
 
@@ -961,6 +985,15 @@ table .align-items-center td span.badge {
     padding-bottom: 0.5rem;
 }
 
+.difference-money .disabled-money {
+    background-color: transparent !important;
+    border: none;
+}
+
+.banking-price-text {
+    color: #525f7f;
+}
+
 .disabled-money,
 .disabled-money input {
     border:none !important;
@@ -1497,10 +1530,6 @@ table .align-items-center td span.badge {
     display: none !important;
 }
 
-#form-select-companies span.el-tag.el-tag--info.el-tag--small.el-tag--light {
-    margin-top: -50px !important;
-}
-
 .document-item-40-px {
     width: 40px;
 }
@@ -1565,9 +1594,15 @@ table .align-items-center td span.badge {
         text-align: left;
         padding-left: 15%;
     }
+
+    @supports (-webkit-touch-callout: none) {
+        .product-select .aka-select.aka-select--fluid.is-open {
+            position: relative;
+            height: 460px;
+            margin-top: unset !important;
+        }
+      }
 }
-
-
 /* Color Picker Submit Button Start */
 
 .el-button.el-color-dropdown__btn.el-button--default.el-button--mini.is-plain {
@@ -1616,3 +1651,87 @@ table .align-items-center td span.badge {
 }
 
  /* Color Picker Submit Button Finish */
+
+/* Select Tag Fixed Content Start */
+.form-group .el-select .el-select__tags > span {
+    display: contents !important;
+}
+/* Select Tag Fixed Content Finish */
+
+/* Line item */
+.line-item-link-container {
+    height: 25px;
+}
+
+.line-item-link {
+    display: flex;
+    padding-bottom: 10px;
+    top: -12px;
+}
+
+.line-item-area {
+    display: flex;
+    justify-content: space-between;
+    align-items:center;
+}
+
+.line-item-content {
+    position: relative;
+    width: 100%;
+    max-width: 242px;
+}
+
+.line-item-content .form-group {
+    position: relative;
+}
+
+.line-item-content .badge {
+    position: absolute !important;
+    bottom: 12px;
+    right: 0;
+}
+
+.line-item-content-right {
+    display: flex;
+    align-items: center;
+}
+
+.line-item-content-right-price  {
+    padding-right: 1.5rem;
+}
+
+.line-item-content-right-delete {
+    width:40px;
+    padding-right: 1.5rem;
+    /* padding-left: 5px !important; */
+}
+
+.line-item-text {
+    width: 54px;
+    text-align: right;
+}
+
+@media (max-width: 1500px) {
+  @media not all and (min-resolution:.001dpcm) { @media {
+
+    .line-item-content {
+        max-width:223px;
+    }
+}}
+}
+
+@media only screen and (max-width: 600px) {
+    .line-item-content {
+        max-width: 133px;
+    }
+}
+
+/* Line item */
+
+/* Accordion Header Arrow Start */
+
+.modal .modal-content .card-header::after {
+    display: none !important;
+}
+
+/* Accordion Header Arrow Finish */

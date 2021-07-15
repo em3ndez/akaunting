@@ -15,8 +15,6 @@ class Role extends LaratrustRole
 
     protected $table = 'roles';
 
-    protected $tenantable = false;
-
     /**
      * The attributes that are mass assignable.
      *
@@ -37,7 +35,7 @@ class Role extends LaratrustRole
         $request = request();
 
         $search = $request->get('search');
-        $limit = $request->get('limit', setting('default.list_limit', '25'));
+        $limit = (int) $request->get('limit', setting('default.list_limit', '25'));
 
         return $query->usingSearchString($search)->sortable($sort)->paginate($limit);
     }

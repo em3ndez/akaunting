@@ -41,10 +41,8 @@
                 </ul>
             </div>
 
-            <div v-else-if="!loading && addNew.status && options.length == 0" slot="empty">
-                <p class="el-select-dropdown__empty">
-                    {{ noDataText }}
-                </p>
+            <div v-if="!loading && addNew.status && options.length == 0">
+                <el-option class="text-center" disabled :label="noDataText" value="value"></el-option>
                 <ul class="el-scrollbar__view el-select-dropdown__list">
                     <li class="el-select-dropdown__item el-select__footer">
                         <div @click="onAddItem">
@@ -64,7 +62,7 @@
             </template>
 
             <el-option v-if="!group" v-for="(option, index) in sortOptions"
-                :key="index"
+                :key="option.key"
                 :disabled="disabledOptions.includes(option.key)"
                 :label="option.value"
                 :value="option.key">
@@ -79,7 +77,7 @@
                 :label="group_options.key">
                 <el-option
                     v-for="(option, option_index) in group_options.value"
-                    :key="option_index"
+                    :key="option.key"
                     :disabled="disabledOptions.includes(option.key)"
                     :label="option.value"
                     :value="option.key">
@@ -88,7 +86,7 @@
                 </el-option>
             </el-option-group>
 
-            <el-option v-if="!loading && addNew.status && options.length != 0  && sortOptions.length > 0" class="el-select__footer" :disabled="disabled" value="">
+            <el-option v-if="!loading && addNew.status && options.length != 0 && sortOptions.length > 0" class="el-select__footer" :disabled="disabled" value="">
                 <div @click="onAddItem">
                     <i class="fas fa-plus"></i>
                     <span>
@@ -142,10 +140,8 @@
                 </ul>
             </div>
 
-            <div v-else-if="!loading && addNew.status && options.length == 0" slot="empty">
-                <p class="el-select-dropdown__empty">
-                    {{ noDataText }}
-                </p>
+            <div v-if="!loading && addNew.status && options.length == 0">
+                <el-option class="text-center" disabled :label="noDataText" value="value"></el-option>
                 <ul class="el-scrollbar__view el-select-dropdown__list">
                     <li class="el-select-dropdown__item el-select__footer">
                         <div @click="onAddItem">
@@ -165,7 +161,7 @@
             </template>
 
             <el-option v-if="!group" v-for="(option, index) in sortOptions"
-                :key="index"
+                :key="option.key"
                 :disabled="disabledOptions.includes(option.key)"
                 :label="option.value"
                 :value="option.key">
@@ -180,7 +176,7 @@
                 :label="group_options.key">
                 <el-option
                     v-for="(option, option_index) in group_options.value"
-                    :key="option_index"
+                    :key="option.key"
                     :disabled="disabledOptions.includes(option.key)"
                     :label="option.value"
                     :value="option.key">
@@ -430,11 +426,16 @@ export default {
         this.selected = this.value;
 
         if (this.model.length) {
-            if (eval(this.model) !== undefined) {
-                this.selected = eval(this.model);
-            } else {
+            try {
+                if (eval(this.model) !== undefined) {
+                    this.selected = eval(this.model);
+                } else {
+                    this.selected = this.model;
+                }
+            } catch (e) {
                 this.selected = this.model;
             }
+            
         }
 
         if (this.multiple && !this.selected.length) {
@@ -468,6 +469,9 @@ export default {
         },
 
         setSortOptions() {
+            // Reset sort_options 
+            this.sort_options = [];
+
             let created_options = (this.dynamicOptions) ? this.dynamicOptions : this.options;
 
             if (this.group) {
@@ -490,11 +494,19 @@ export default {
                     }
                 } else {
                     created_options.forEach(function (option, index) {
-                        this.sort_options.push({
-                            index: index,
-                            key: option.id,
-                            value: (option.title) ? option.title : (option.display_name) ? option.display_name : option.name
-                        });
+                        if (typeof(option) == 'string') {
+                            this.sort_options.push({
+                                index: index,
+                                key: index.toString(),
+                                value: option
+                            });
+                        } else {
+                            this.sort_options.push({
+                                index: index,
+                                key: option.id,
+                                value: (option.title) ? option.title : (option.display_name) ? option.display_name : option.name
+                            });
+                        }
                     }, this);
                 }
             } else {
@@ -508,11 +520,19 @@ export default {
                     }
                 } else {
                     created_options.forEach(function (option, index) {
-                        this.sort_options.push({
-                            index: index,
-                            key: option.id,
-                            value: (option.title) ? option.title : (option.display_name) ? option.display_name : option.name
-                        });
+                        if (typeof(option) == 'string') {
+                            this.sort_options.push({
+                                index: index,
+                                key: index.toString(),
+                                value: option
+                            });
+                        } else {
+                            this.sort_options.push({
+                                index: index,
+                                key: option.id,
+                                value: (option.title) ? option.title : (option.display_name) ? option.display_name : option.name
+                            });
+                        }
                     }, this);
                 }
             }
@@ -531,7 +551,7 @@ export default {
             // Option changed sort_option data
             if (this.group) {
                 this.sort_options.forEach(function (option_group, group_index) {
-                    this.option_group.value.forEach(function (option, index) {
+                    option_group.value.forEach(function (option, index) {
                         if (this.multiple) {
                             let indexs = [];
                             let values = [];
@@ -539,7 +559,7 @@ export default {
                             let options = [];
 
                             this.selected.forEach(function (selected_option_id, selected_index) {
-                                if (option.value == selected_option_id) {
+                                if (option.key == selected_option_id) {
                                     indexs.push(selected_index);
                                     values.push(option.id);
                                     labels.push(option.value);
@@ -552,7 +572,7 @@ export default {
                             this.$emit('label', labels);
                             this.$emit('option', options);
                         } else {
-                            if (option.value == this.selected) {
+                            if (option.key == this.selected) {
                                 this.$emit('index', index);
                                 this.$emit('value', option.id);
                                 this.$emit('label', option.value);
@@ -570,7 +590,7 @@ export default {
                         let options = [];
 
                         this.selected.forEach(function (selected_option_id, selected_index) {
-                            if (option.value == selected_option_id) {
+                            if (option.key == selected_option_id) {
                                 indexs.push(selected_index);
                                 values.push(option.id);
                                 labels.push(option.value);
@@ -583,7 +603,7 @@ export default {
                         this.$emit('label', labels);
                         this.$emit('option', options);
                     } else {
-                        if (option.value == this.selected) {
+                        if (option.key == this.selected) {
                             this.$emit('index', index);
                             this.$emit('value', option.id);
                             this.$emit('label', option.value);
@@ -652,15 +672,31 @@ export default {
 
                     if (response.data.data) {
                         let data = response.data.data;
-
-                        this.sort_options = [];
+                        //this.sort_options = [];
 
                         data.forEach(function (option) {
-                            this.sort_options.push({
-                                key: option.id.toString(),
-                                value: (option.title) ? option.title : (option.display_name) ? option.display_name : option.name
+                            let check = false;
+
+                            this.sort_options.forEach(function (sort_option) {
+                                if (sort_option.key == option.id) {
+                                    check = true;
+                                    return;
+                                }
                             });
+
+                            if (!check) {
+                                this.sort_options.push({
+                                    key: option.id.toString(),
+                                    value: (option.title) ? option.title : (option.display_name) ? option.display_name : option.name
+                                });
+                            }
+
                         }, this);
+
+                        this.sort_options = this.sort_options.filter(item => {
+                            return item.value.toLowerCase()
+                                .indexOf(query.toLowerCase()) > -1;
+                        });
                     } else {
                         this.sortOptions = [];
                     }
@@ -982,11 +1018,19 @@ export default {
                     }
                 } else {
                     options.forEach(function (option, index) {
-                        this.sort_options.push({
-                            index: index,
-                            key: option.id,
-                            value: (option.title) ? option.title : (option.display_name) ? option.display_name : option.name
-                        });
+                        if (typeof(option) == 'string') {
+                            this.sort_options.push({
+                                index: index,
+                                key: index.toString(),
+                                value: option
+                            });
+                        } else {
+                            this.sort_options.push({
+                                index: index,
+                                key: option.id,
+                                value: (option.title) ? option.title : (option.display_name) ? option.display_name : option.name
+                            });
+                        }
                     }, this);
                 }
             } else {
@@ -1000,11 +1044,19 @@ export default {
                     }
                 } else {
                     options.forEach(function (option, index) {
-                        this.sort_options.push({
-                            index: index,
-                            key: option.id,
-                            value: (option.title) ? option.title : (option.display_name) ? option.display_name : option.name
-                        });
+                        if (typeof(option) == 'string') {
+                            this.sort_options.push({
+                                index: index,
+                                key: index.toString(),
+                                value: option
+                            });
+                        } else {
+                            this.sort_options.push({
+                                index: index,
+                                key: option.id,
+                                value: (option.title) ? option.title : (option.display_name) ? option.display_name : option.name
+                            });
+                        }
                     }, this);
                 }
             }

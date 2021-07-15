@@ -1,33 +1,21 @@
 @extends('layouts.admin')
 
-@section('title', trans('import.title', ['type' => trans_choice($namespace . 'general.' . $type, 2)]))
+@section('title', trans('import.title', ['type' => $title_type]))
 
 @section('content')
     <div class="card">
-        @php 
-        $form_open = [
-            'id' => 'import',
-            '@submit.prevent' => 'onSubmit',
-            '@keydown' => 'form.errors.clear($event.target.name)',
-            'files' => true,
-            'role' => 'form',
-            'class' => 'form-loading-button',
-            'novalidate' => true
-        ];
-
-        if (!empty($route)) {
-            $form_open['route'] = $route;
-        } else {
-            $form_open['url'] = $path . '/import';
-        }
-        @endphp
-        {!! Form::open($form_open) !!}
+        {!! Form::open($form_params) !!}
 
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-12">
+                        <div class="alert alert-warning alert-important">
+                            {!! trans('import.limitations', ['extensions' => strtoupper(config('excel.imports.extensions')), 'row_limit' => config('excel.imports.row_limit')]) !!}
+                        </div>
+                    </div>
+                    <div class="col-md-12">
                         <div class="alert alert-info alert-important">
-                            {!! trans('import.message', ['link' => url('public/files/import/' . $type . '.xlsx')]) !!}
+                            {!! trans('import.sample_file', ['download_link' => $sample_file]) !!}
                         </div>
                     </div>
 
@@ -54,6 +42,7 @@
                     </div>
                 </div>
             </div>
+
         {!! Form::close() !!}
     </div>
 @endsection

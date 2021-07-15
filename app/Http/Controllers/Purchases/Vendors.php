@@ -78,7 +78,7 @@ class Vendors extends Controller
         }
 
         // Handle payments
-        $transactions = Transaction::with('category')->where('contact_id', $vendor->id)->expense()->get();
+        $transactions = Transaction::with('account', 'category')->where('contact_id', $vendor->id)->expense()->get();
 
         $counts['transactions'] = $transactions->count();
 
@@ -87,7 +87,7 @@ class Vendors extends Controller
             $amounts['paid'] += $item->getAmountConvertedToDefault();
         });
 
-        $limit = request('limit', setting('default.list_limit', '25'));
+        $limit = (int) request('limit', setting('default.list_limit', '25'));
         $transactions = $this->paginate($transactions->sortByDesc('paid_at'), $limit);
         $bills = $this->paginate($bills->sortByDesc('issued_at'), $limit);
 
@@ -291,35 +291,17 @@ class Vendors extends Controller
         return $this->exportExcel(new Export, trans_choice('general.vendors', 2));
     }
 
-    public function currency(Contact $vendor)
+    public function createBill(Contact $vendor)
     {
-        if (empty($vendor)) {
-            return response()->json([]);
-        }
+        $data['contact'] = $vendor;
 
-        $currency_code = setting('default.currency');
+        return redirect()->route('bills.create')->withInput($data);
+    }
 
-        if (isset($vendor->currency_code)) {
-            $currencies = Currency::enabled()->pluck('name', 'code')->toArray();
+    public function createPayment(Contact $vendor)
+    {
+        $data['contact'] = $vendor;
 
-            if (array_key_exists($vendor->currency_code, $currencies)) {
-                $currency_code = $vendor->currency_code;
-            }
-        }
-
-        // Get currency object
-        $currency = Currency::where('code', $currency_code)->first();
-
-        $vendor->currency_name = $currency->name;
-        $vendor->currency_code = $currency_code;
-        $vendor->currency_rate = $currency->rate;
-
-        $vendor->thousands_separator = $currency->thousands_separator;
-        $vendor->decimal_mark = $currency->decimal_mark;
-        $vendor->precision = (int) $currency->precision;
-        $vendor->symbol_first = $currency->symbol_first;
-        $vendor->symbol = $currency->symbol;
-
-        return response()->json($vendor);
+        return redirect()->route('payments.create')->withInput($data);
     }
 }

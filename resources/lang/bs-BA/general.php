@@ -51,6 +51,7 @@ return [
     'templates'             => 'Predložak|Predlošci',
     'sales'                 => 'Prodaja|Prodaje',
     'purchases'             => 'Kupnja|Kupnje',
+    'notifications'         => 'Notifikacija|Notifikacije',
 
     'welcome'               => 'Dobrodošli',
     'banking'               => 'Bankarstvo',
@@ -160,6 +161,8 @@ return [
     'recurring_and_more'    => 'Ponavlja se i više',
     'due_on'                => 'Datum dospjeća',
     'amount_due'            => 'Dospjeli iznos',
+    'financial_year'        => 'Početak fiskalne godine',
+    'created'               => 'Kreirano',
 
     'card' => [
         'cards'                 => 'Kartica|Kartice',

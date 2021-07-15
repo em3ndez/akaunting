@@ -22,16 +22,6 @@ class Company extends FormRequest
     }
 
     /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
-    public function authorize()
-    {
-        return true;
-    }
-
-    /**
      * Get the validation rules that apply to the request.
      *
      * @return array
@@ -39,7 +29,7 @@ class Company extends FormRequest
     public function rules()
     {
         $rules = [
-            'company_logo' => 'mimes:' . config('filesystems.mimes') . '|between:0,' . config('filesystems.max_size') * 1024,
+            'logo' => 'mimes:' . config('filesystems.mimes') . '|between:0,' . config('filesystems.max_size') * 1024 . '|dimensions:max_width=1000,max_height=1000',
         ];
 
         if (!setting('apps.api_key', false) && !empty($this->request->get('api_key'))) {

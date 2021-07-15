@@ -3,7 +3,7 @@
 return [
 
     'edit_columns'  => 'Editar colunas',
-    'empty_items'   =>'Você não adicionou nenhum item.',
+    'empty_items'   => 'Você não adicionou nenhum item.',
 
     'statuses' => [
         'draft'         => 'Rascunho',
@@ -34,7 +34,7 @@ return [
         'billed'        => 'Faturado',
         'delivered'     => 'Entregue',
         'returned'      => 'Devolvido',
-        'drawn'         => 'Esboçado',
+        'drawn'         => 'Rascunho',
         'not_billed'    => 'Não faturado',
         'issued'        => 'Emitido',
         'not_invoiced'  => 'Não faturado',

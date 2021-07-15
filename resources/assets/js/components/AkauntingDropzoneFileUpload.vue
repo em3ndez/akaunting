@@ -1,5 +1,5 @@
 <template>
-    <div id="dropzone" class="dropzone mb-3 dz-clickable" :class="[preview == 'single' ? 'dropzone-single': 'dropzone-multiple']">
+    <div :id="'dropzone-' + _uid" class="dropzone mb-3 dz-clickable" :class="[preview == 'single' ? 'dropzone-single': 'dropzone-multiple']">
         <div class="fallback">
             <div class="custom-file">
                 <input type="file" class="custom-file-input" :id="'projectCoverUploads' + _uid" :multiple="multiple">
@@ -213,7 +213,9 @@ export default {
                             });
 
                             if (self.preview == 'single' && self.attachments.length == 1) {
-                                document.querySelector("#dropzone").classList.add("dz-max-files-reached");
+                                self.$nextTick(() => {
+                                    document.querySelector("#dropzone-" + self._uid).classList.add("dz-max-files-reached");
+                                });
                             }
                         }, 100);
                     }
@@ -229,6 +231,42 @@ export default {
     async mounted() {
         this.initDropzone();
     },
+    
+    watch: {
+    attachments: function (attachments) {
+      attachments.forEach((attachment) => {
+          if(attachment.length != undefined) {
+              var mockFile = {
+                id: attachment[0].id,
+                name: attachment[0].name,
+                size: attachment[0].size,
+                type: attachment[0].type,
+                download: attachment[0].downloadPath,
+                dropzone: 'edit',
+            };
+            this.dropzone.emit("addedfile", mockFile);
+            this.dropzone.options.thumbnail.call(this.dropzone, mockFile, attachment[0].path);
+
+            // Make sure that there is no progress bar, etc...
+            this.dropzone.emit("complete", mockFile);
+
+            this.files.forEach(async (attachment) => {
+                if (attachment.download) {
+                    attachment.previewElement.querySelector("[data-dz-download]").href = attachment.download;
+                    attachment.previewElement.querySelector("[data-dz-download]").classList.remove("d-none");
+                }
+        });
+
+        if (this.preview == 'single' && attachments.length == 1) {
+            this.$nextTick(() => {
+                document.querySelector("#dropzone-" + this._uid).classList.add("dz-max-files-reached");
+            });
+        }
+          }
+        }, this);
+
+    },
+  },
 }
 </script>
 

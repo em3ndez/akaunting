@@ -47,11 +47,15 @@ class Overrider
 
         // Locale
         if (session('locale') == '') {
-            app()->setLocale(setting('default.locale'));
+            $locale = (user()->locale) ?? setting('default.locale');
+
+            app()->setLocale($locale);
         }
 
-        // Set app url dynamically
-        config(['app.url' => url('/')]);
+        // Set app url dynamically if empty
+        if (!config('app.url')) {
+            config(['app.url' => url('/')]);
+        }
     }
 
     protected static function loadCurrencies()

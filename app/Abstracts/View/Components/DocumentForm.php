@@ -5,6 +5,7 @@ namespace App\Abstracts\View\Components;
 use App\Abstracts\View\Components\Document as Base;
 use App\Models\Common\Contact;
 use App\Models\Document\Document;
+use App\Models\Setting\Currency;
 use App\Traits\Documents;
 use Date;
 use Illuminate\Support\Str;
@@ -17,9 +18,18 @@ abstract class DocumentForm extends Base
 
     public $document;
 
+    public $currencies;
+
+    public $currency;
+
+    public $currency_code;
+
     /** Advanced Component Start */
     /** @var string */
     public $categoryType;
+
+    /** @var string */
+    public $textAdvancedAccordion;
 
     /** @var bool */
     public $hideRecurring;
@@ -205,9 +215,9 @@ abstract class DocumentForm extends Base
      * @return void
      */
     public function __construct(
-        $type, $document = false,
+        $type, $document = false, $currencies = false, $currency = false, $currency_code = false,
         /** Advanced Component Start */
-        string $categoryType = '', bool $hideRecurring = false, bool $hideCategory = false, bool $hideAttachment = false,
+        string $categoryType = '', string $textAdvancedAccordion = '', bool $hideRecurring = false, bool $hideCategory = false, bool $hideAttachment = false,
         /** Advanced Component End */
         /** Company Component Start */
         bool $hideLogo = false, bool $hideDocumentTitle = false, bool $hideDocumentSubheading = false, bool $hideCompanyEdit = false,
@@ -235,9 +245,13 @@ abstract class DocumentForm extends Base
     ) {
         $this->type = $type;
         $this->document = $document;
+        $this->currencies = $this->getCurrencies($currencies);
+        $this->currency = $this->getCurrency($document, $currency, $currency_code);
+        $this->currency_code = $this->currency->code;
 
         /** Advanced Component Start */
         $this->categoryType = $this->getCategoryType($type, $categoryType);
+        $this->textAdvancedAccordion = $this->getTextAdvancedAccordion($type, $textAdvancedAccordion);
         $this->hideRecurring = $hideRecurring;
         $this->hideCategory = $hideCategory;
         $this->hideAttachment = $hideAttachment;
@@ -314,6 +328,32 @@ abstract class DocumentForm extends Base
         /** Items Component End */
     }
 
+    protected function getCurrencies($currencies)
+    {
+        if (!empty($currencies)) {
+            return $currencies;
+        }
+
+        return Currency::enabled()->pluck('name', 'code');
+    }
+
+    protected function getCurrency($document, $currency, $currency_code)
+    {
+        if (!empty($currency)) {
+            return $currency;
+        }
+
+        if (!empty($currency_code)) {
+            return Currency::where('code', $currency_code)->first();
+        }
+
+        if (!empty($document)) {
+            return Currency::where('code', $document->currency_code)->first();
+        }
+
+        return Currency::where('code', setting('default.currency'))->first();
+    }
+
     protected function getRouteStore($type, $routeStore)
     {
         if (!empty($routeStore)) {
@@ -377,6 +417,21 @@ abstract class DocumentForm extends Base
         $type = Document::INVOICE_TYPE;
 
         return config('type.' . $type . '.category_type');
+    }
+
+    protected function getTextAdvancedAccordion($type, $textAdvancedAccordion)
+    {
+        if (!empty($textAdvancedAccordion)) {
+            return $textAdvancedAccordion;
+        }
+
+        $translation = $this->getTextFromConfig($type, 'advanced_accordion');
+
+        if (!empty($translation)) {
+            return $translation;
+        }
+
+        return 'general.recurring_and_more';
     }
 
     protected function getContacts($type, $contacts)

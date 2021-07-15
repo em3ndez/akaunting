@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Image;
 use Intervention\Image\Exception\NotReadableException;
-use Storage;
+use Illuminate\Support\Facades\Storage;
 
 abstract class DocumentShow extends Base
 {
@@ -96,6 +96,9 @@ abstract class DocumentShow extends Base
     public $routeButtonPaid;
 
     /** @var string */
+    public $routeContactShow;
+
+    /** @var string */
     public $permissionCreate;
 
     /** @var string */
@@ -103,6 +106,9 @@ abstract class DocumentShow extends Base
 
     /** @var string */
     public $permissionDelete;
+
+    /** @var string */
+    public $permissionTransactionDelete;
 
     /** @var string */
     public $permissionButtonCustomize;
@@ -232,6 +238,12 @@ abstract class DocumentShow extends Base
 
     /** @var bool */
     public $hideTimelineCreate;
+
+    /** @var string */
+    public $textDocumentTitle;
+
+    /** @var string */
+    public $textDocumentSubheading;
 
     /** @var string */
     public $textTimelineCreateTitle;
@@ -364,9 +376,9 @@ abstract class DocumentShow extends Base
         $type, $document, $documentTemplate = '', $logo = '', $backgroundColor = '', string $signedUrl = '', $histories = [], $transactions = [],
         string $textRecurringType = '', string $textStatusMessage = '', string $textHistories = '', string $textHistoryStatus = '',
         string $routeButtonAddNew = '', string $routeButtonEdit = '', string $routeButtonDuplicate = '', string $routeButtonPrint = '', string $routeButtonPdf = '', string $routeButtonCancelled = '', string $routeButtonDelete = '', string $routeButtonCustomize = '', string $routeButtonSent = '',
-        string $routeButtonReceived = '', string $routeButtonEmail = '', string $routeButtonPaid = '',
+        string $routeButtonReceived = '', string $routeButtonEmail = '', string $routeButtonPaid = '', string $routeContactShow = '',
         bool $checkButtonReconciled = true, bool $checkButtonCancelled = true,
-        string $permissionCreate = '', string $permissionUpdate = '', string $permissionDelete = '', string $permissionButtonCustomize = '',
+        string $permissionCreate = '', string $permissionUpdate = '', string $permissionDelete = '', string $permissionTransactionDelete = '', string $permissionButtonCustomize = '',
         bool $hideButtonGroupDivider1 = false, bool $hideButtonGroupDivider2 = false, bool $hideButtonGroupDivider3 = false,
         bool $hideButtonMoreActions = false, bool $hideButtonAddNew = false, bool $hideButtonEdit = false, bool $hideButtonDuplicate = false, bool $hideButtonPrint = false, bool $hideButtonPdf = false, bool $hideButtonCancel = false, bool $hideButtonCustomize = false, bool $hideButtonDelete = false,
         bool $hideHeader = false,bool $hideRecurringMessage = false, bool $hideStatusMessage = false, bool $hideTimeline = false, bool $hideFooter = false, bool $hideFooterHistories = false, bool $hideFooterTransactions = false,
@@ -374,6 +386,7 @@ abstract class DocumentShow extends Base
         string $textHeaderContact = '', string $textHeaderAmount = '', string $textHeaderDueAt = '',
         string $classHeaderStatus = '', string $classHeaderContact = '', string $classHeaderAmount = '', string $classHeaderDueAt = '', string $classFooterHistories = '', string $classFooterTransactions = '',
         bool $hideHeaderStatus = false, bool $hideHeaderContact = false, bool $hideHeaderAmount = false, bool $hideHeaderDueAt = false,
+        string $textDocumentTitle = '', string $textDocumentSubheading = '',
         string $textTimelineCreateTitle = '', string $textTimelineCreateMessage = '', string $textTimelineSentTitle = '', string $textTimelineSentStatusDraft = '', string $textTimelineSentStatusMarkSent = '', string $textTimelineSentStatusReceived = '', string $textTimelineSendStatusMail = '',
         string $textTimelineGetPaidTitle = '', string $textTimelineGetPaidStatusAwait = '', string $textTimelineGetPaidStatusPartiallyPaid = '', string $textTimelineGetPaidMarkPaid = '', string $textTimelineGetPaidAddPayment = '',
         bool $hideTimelineCreate = false, bool $hideCompanyLogo = false, bool $hideCompanyDetails = false,
@@ -414,10 +427,12 @@ abstract class DocumentShow extends Base
         $this->routeButtonCustomize = $this->getRouteButtonCustomize($type, $routeButtonCustomize);
         $this->routeButtonDelete = $this->getRouteButtonDelete($type, $routeButtonDelete);
         $this->routeButtonPaid = $this->getRouteButtonPaid($type, $routeButtonPaid);
+        $this->routeContactShow = $this->getRouteContactShow($type, $routeContactShow);
 
         $this->permissionCreate = $this->getPermissionCreate($type, $permissionCreate);
         $this->permissionUpdate = $this->getPermissionUpdate($type, $permissionUpdate);
         $this->permissionDelete = $this->getPermissionDelete($type, $permissionDelete);
+        $this->permissionTransactionDelete = $this->getPermissionTransactionDelete($type, $permissionTransactionDelete);
         $this->permissionButtonCustomize = $this->getPermissionButtonCustomize($type, $permissionButtonCustomize);
 
         $this->hideButtonGroupDivider1 = $hideButtonGroupDivider1;
@@ -470,6 +485,8 @@ abstract class DocumentShow extends Base
         $this->hideButtonShare = $hideButtonShare;
         $this->hideButtonPaid = $hideButtonPaid;
 
+        $this->textDocumentTitle = $this->getTextDocumentTitle($type, $textDocumentTitle);
+        $this->textDocumentSubheading = $this->gettextDocumentSubheading($type, $textDocumentSubheading);
         $this->textTimelineCreateTitle = $this->getTextTimelineCreateTitle($type, $textTimelineCreateTitle);
         $this->textTimelineCreateMessage = $this->getTextTimelineCreateMessage($type, $textTimelineCreateMessage);
         $this->textTimelineSentTitle = $this->getTextTimelineSentTitle($type, $textTimelineSentTitle);
@@ -591,12 +608,14 @@ abstract class DocumentShow extends Base
             return $logo;
         }
 
-        $media = Media::find(setting('company.logo'));
+        $media_id = (!empty($this->document->contact->logo) && !empty($this->document->contact->logo->id)) ? $this->document->contact->logo->id : setting('company.logo');
+
+        $media = Media::find($media_id);
 
         if (!empty($media)) {
-            $path = Storage::path($media->getDiskPath());
+            $path = $media->getDiskPath();
 
-            if (!is_file($path)) {
+            if (Storage::missing($path)) {
                 return $logo;
             }
         } else {
@@ -604,11 +623,15 @@ abstract class DocumentShow extends Base
         }
 
         try {
-            $image = Image::cache(function($image) use ($path) {
+            $image = Image::cache(function($image) use ($media, $path) {
                 $width = setting('invoice.logo_size_width');
                 $height = setting('invoice.logo_size_height');
 
-                $image->make($path)->resize($width, $height)->encode();
+                if ($media) {
+                    $image->make(Storage::get($path))->resize($width, $height)->encode();
+                } else {
+                    $image->make($path)->resize($width, $height)->encode();
+                }
             });
         } catch (NotReadableException | \Exception $e) {
             Log::info('Company ID: ' . company_id() . ' components/documentshow.php exception.');
@@ -867,6 +890,36 @@ abstract class DocumentShow extends Base
         return 'invoices.paid';
     }
 
+    protected function getRouteContactShow($type, $routeContactShow)
+    {
+        if (!empty($routeContactShow)) {
+            return $routeContactShow;
+        }
+
+        //example route parameter.
+        $parameter = 1;
+
+        $route = Str::plural(config('type.' . $type . '.contact_type'), 2) . '.show';
+
+        try {
+            route($route, $parameter);
+        } catch (\Exception $e) {
+            try {
+                $route = Str::plural($type, 2) . '.' . $config_key;
+
+                route($route, $parameter);
+            } catch (\Exception $e) {
+                $route = '';
+            }
+        }
+
+        if (!empty($route)) {
+            return $route;
+        }
+
+        return 'customers.show';
+    }
+
     protected function getRouteButtonSent($type, $routeButtonSent)
     {
         if (!empty($routeButtonSent)) {
@@ -952,6 +1005,17 @@ abstract class DocumentShow extends Base
         $permissionDelete = $this->getPermissionFromConfig($type, 'delete');
 
         return $permissionDelete;
+    }
+
+    protected function getPermissionTransactionDelete($type, $permissionTransactionDelete)
+    {
+        if (!empty($permissionTransactionDelete)) {
+            return $permissionTransactionDelete;
+        }
+
+        $permissionTransactionDelete = 'delete-banking-transactions';
+
+        return $permissionTransactionDelete;
     }
 
     protected function getPermissionButtonCustomize($type, $permissionButtonCustomize)
@@ -1115,6 +1179,44 @@ abstract class DocumentShow extends Base
         }
 
         return $hideTimelineStatuses;
+    }
+
+    protected function getTextDocumentTitle($type, $textDocumentTitle)
+    {
+        if (!empty($textDocumentTitle)) {
+            return $textDocumentTitle;
+        }
+
+        if (!empty(setting($type . '.title'))) {
+            return setting($type . '.title');
+        }
+
+        $translation = $this->getTextFromConfig($type, 'document_title', Str::plural($type), 'trans_choice');
+
+        if (!empty($translation)) {
+            return trans_choice($translation, 1);
+        }
+
+        return setting('invoice.title');
+    }
+
+    protected function getTextDocumentSubheading($type, $textDocumentSubheading)
+    {
+        if (!empty($textDocumentSubheading)) {
+            return $textDocumentSubheading;
+        }
+
+        if (!empty(setting($type . '.subheading'))) {
+            return setting($type . '.subheading');
+        }
+
+        $translation = $this->getTextFromConfig($type, 'document_subheading', 'subheading');
+
+        if (!empty($translation)) {
+            return trans($translation);
+        }
+
+        return setting('invoice.subheading');
     }
 
     protected function getTextTimelineCreateTitle($type, $textTimelineCreateTitle)

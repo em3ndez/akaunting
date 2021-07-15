@@ -23,6 +23,12 @@ class Money
             return $next($request);
         }
 
+        $currency_code = setting('default.currency');
+
+        if ($request->has('currency_code')) {
+            $currency_code = $request->get('currency_code');
+        }
+
         $parameters = [
             'amount',
             'sale_price',
@@ -37,11 +43,15 @@ class Money
 
             $money_format = $request->get($parameter);
 
+            if (!preg_match("/^(?=.*?[0-9])[0-9.,]+$/", $money_format)) {
+                continue;
+            }
+
             if ($parameter == 'sale_price' || $parameter == 'purchase_price') {
                 $money_format = Str::replaceFirst(',', '.', $money_format);
             }
 
-            $amount = $this->getAmount($money_format);
+            $amount = $this->getAmount($money_format, $currency_code);
 
             $request->request->set($parameter, $amount);
         }
@@ -56,7 +66,15 @@ class Money
                         continue;
                     }
 
-                    $amount = $this->getAmount($item['price']);
+                    if (!preg_match("/^(?=.*?[0-9])[0-9.,]+$/", $item['price'])) {
+                        continue;
+                    }
+
+                    $amount = $item['price'];
+
+                    if (strpos($item['price'], config('money.' . $currency_code . '.symbol')) !== false) {
+                        $amount = $this->getAmount($item['price'], $currency_code);
+                    }
 
                     $items[$key]['price'] = $amount;
                 }
@@ -68,14 +86,22 @@ class Money
         return $next($request);
     }
 
-    protected function getAmount($money_format)
+    protected function getAmount($money_format, $currency_code)
     {
         try {
-            $amount = money($money_format)->getAmount();
+            if (config('money.' . $currency_code . '.decimal_mark') !== '.') {
+                $money_format = Str::replaceFirst('.', config('money.' . $currency_code . '.decimal_mark'), $money_format);
+            }
+
+            $amount = money($money_format, $currency_code)->getAmount();
         } catch (InvalidArgumentException | OutOfBoundsException | UnexpectedValueException $e) {
-            logger($e->getMessage());
+            report($e);
 
             $amount = 0;
+
+            if ($money_format === null) {
+                $amount = $money_format;
+            }
         }
 
         return $amount;

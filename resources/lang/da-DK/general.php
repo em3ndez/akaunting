@@ -51,6 +51,7 @@ return [
     'templates'             => 'Skabelon|Skabeloner',
     'sales'                 => 'Salg|Salg',
     'purchases'             => 'Bestilling|Bestillinger',
+    'notifications'         => 'Notifikation|Notifikationer',
 
     'welcome'               => 'Velkommen',
     'banking'               => 'Bank',
@@ -95,7 +96,7 @@ return [
     'attachment'            => 'Bilag',
     'change'                => 'Ændre',
     'change_type'           => 'Skift :type',
-    'switch'                => 'Skift',
+    'switch'                => 'Skift til',
     'color'                 => 'Farve',
     'save'                  => 'Gem',
     'confirm'               => 'Bekræft',
@@ -157,9 +158,11 @@ return [
     'go_to_dashboard'       => 'Gå til skrivebordet',
     'is'                    => 'er',
     'isnot'                 => 'er ikke',
-    'recurring_and_more'    => 'Tilbagevendende og mere..',
+    'recurring_and_more'    => 'Bilag og gentagelser',
     'due_on'                => 'Forfalder den',
     'amount_due'            => 'Forfaldent beløb',
+    'financial_year'        => 'Regnskabsår',
+    'created'               => 'Oprettet',
 
     'card' => [
         'cards'                 => 'Kort|Kort

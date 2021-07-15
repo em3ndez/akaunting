@@ -40,13 +40,17 @@ class Queue extends Provider
             $payload = $event->job->payload();
 
             if (!array_key_exists('company_id', $payload)) {
-                return;
+                $event->job->delete();
+
+                throw new \Exception('Missing company. Payload: ' . json_encode($payload));
             }
 
             $company = company($payload['company_id']);
 
             if (empty($company)) {
                 $event->job->delete();
+
+                throw new \Exception('Company not found. Payload: ' . json_encode($payload));
             }
 
             $company->makeCurrent();
@@ -78,7 +82,7 @@ class Queue extends Provider
             // Get import class
             $class = $ref->getValue($excel_job);
 
-            if (!$class instanceof \App\Abstracts\Import) {
+            if (!$class instanceof \App\Abstracts\Import && !$class instanceof \App\Abstracts\ImportMultipleSheets) {
                 return;
             }
 

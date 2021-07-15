@@ -10,22 +10,15 @@ use Illuminate\Support\Str;
 class Document extends FormRequest
 {
     /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
-    public function authorize()
-    {
-        return true;
-    }
-
-    /**
      * Get the validation rules that apply to the request.
      *
      * @return array
      */
     public function rules()
     {
+        $company_logo = 'nullable';
+        $attachment = 'nullable';
+
         $type = $this->request->get('type', Model::INVOICE_TYPE);
 
         $type = config('type.' . $type . '.route.parameter');
@@ -39,15 +32,11 @@ class Document extends FormRequest
             $id = null;
         }
 
-        $company_logo = 'nullable';
-
-        if ($this->request->get('company_logo', null)) {
-            $company_logo = 'mimes:' . config('filesystems.mimes') . '|between:0,' . config('filesystems.max_size') * 1024;
+        if ($this->files->get('company_logo')) {
+            $company_logo = 'mimes:' . config('filesystems.mimes') . '|between:0,' . config('filesystems.max_size') * 1024 . '|dimensions:max_width=1000,max_height=1000';
         }
 
-        $attachment = 'nullable';
-
-        if ($this->request->get('attachment', null)) {
+        if ($this->files->get('attachment')) {
             $attachment = 'mimes:' . config('filesystems.mimes') . '|between:0,' . config('filesystems.max_size') * 1024;
         }
 
@@ -58,14 +47,14 @@ class Document extends FormRequest
             'type' => 'required|string',
             'document_number' => 'required|string|unique:documents,NULL,' . $id . ',id,type,' . $type . ',company_id,' . $company_id . ',deleted_at,NULL',
             'status' => 'required|string',
-            'issued_at' => 'required|date_format:Y-m-d H:i:s',
-            'due_at' => 'required|date_format:Y-m-d H:i:s',
+            'issued_at' => 'required|date_format:Y-m-d H:i:s|before_or_equal:due_at',
+            'due_at' => 'required|date_format:Y-m-d H:i:s|after_or_equal:issued_at',
             'amount' => 'required',
             'items.*.name' => 'required|string',
             'items.*.quantity' => 'required',
             'items.*.price' => 'required|amount',
             'currency_code' => 'required|string|currency',
-            'currency_rate' => 'required',
+            'currency_rate' => 'required|gt:0',
             'contact_id' => 'required|integer',
             'contact_name' => 'required|string',
             'category_id' => 'required|integer',

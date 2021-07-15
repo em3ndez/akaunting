@@ -77,6 +77,12 @@ return [
         ],
     ],
 
+    'transfer' => [
+        'choose_template'   => 'Choose transfer template',
+        'second'            => 'Second',
+        'third'             => 'Third',
+    ],
+
     'default' => [
         'description'       => 'Default account, currency, language of your company',
         'list_limit'        => 'Records Per Page',
@@ -115,6 +121,7 @@ return [
             'invoice_payment_admin'     => 'Payment Received Template (sent to admin)',
             'bill_remind_admin'         => 'Bill Reminder Template (sent to admin)',
             'bill_recur_admin'          => 'Bill Recurring Template (sent to admin)',
+            'revenue_new_customer'      => 'Revenue Received Template (sent to customer)',
         ],
     ],
 

@@ -7,16 +7,6 @@ use App\Abstracts\Http\FormRequest;
 class Item extends FormRequest
 {
     /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
-    public function authorize()
-    {
-        return true;
-    }
-
-    /**
      * Get the validation rules that apply to the request.
      *
      * @return array
@@ -25,14 +15,14 @@ class Item extends FormRequest
     {
         $picture = 'nullable';
 
-        if ($this->request->get('picture', null)) {
-            $picture = 'mimes:' . config('filesystems.mimes') . '|between:0,' . config('filesystems.max_size') * 1024;
+        if ($this->files->get('picture')) {
+            $picture = 'mimes:' . config('filesystems.mimes') . '|between:0,' . config('filesystems.max_size') * 1024 . '|dimensions:max_width=1000,max_height=1000';
         }
 
         return [
             'name' => 'required|string',
-            'sale_price' => 'required',
-            'purchase_price' => 'required',
+            'sale_price' => 'required|regex:/^(?=.*?[0-9])[0-9.,]+$/',
+            'purchase_price' => 'required|regex:/^(?=.*?[0-9])[0-9.,]+$/',
             'tax_ids' => 'nullable|array',
             'category_id' => 'nullable|integer',
             'enabled' => 'integer|boolean',

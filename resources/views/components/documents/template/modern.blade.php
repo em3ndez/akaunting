@@ -1,10 +1,26 @@
+<div class="row">
+    <div class="col-100">
+        <div class="text">
+            <h3>
+                {{ $textDocumentTitle }}
+            </h3>
+
+            @if ($textDocumentSubheading) 
+                <h5>
+                    {{ $textDocumentSubheading }}
+                </h5>
+            @endif
+        </div>
+    </div>
+</div>
+
 <div class="row" style="background-color:{{ $backgroundColor }} !important; -webkit-print-color-adjust: exact;">
     <div class="col-58">
         <div class="text company pl-2 mb-1 d-flex align-items-center">
             @stack('company_logo_start')
             @if (!$hideCompanyLogo)
                 @if (!empty($document->contact->logo) && !empty($document->contact->logo->id))
-                    <img src="{{ Storage::url($document->contact->logo->id) }}" height="128" width="128" alt="{{ $document->contact_name }}"/>
+                    <img src="{{ $logo }}" alt="{{ $document->contact_name }}"/>
                 @else
                     <img src="{{ $logo }}" alt="{{ setting('company.name') }}" />
                 @endif

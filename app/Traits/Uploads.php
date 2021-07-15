@@ -3,33 +3,12 @@
 namespace App\Traits;
 
 use App\Models\Common\Media as MediaModel;
+use App\Utilities\Date;
+use Illuminate\Support\Facades\Storage;
 use MediaUploader;
 
 trait Uploads
 {
-    public function getUploadedFilePath($file, $folder = 'settings', $company_id = null)
-    {
-        $path = '';
-
-        if (!$file || !$file->isValid()) {
-            return $path;
-        }
-
-        if (!$company_id) {
-            $company_id = company_id();
-        }
-
-        $file_name = $file->getClientOriginalName();
-
-        // Upload file
-        $file->storeAs($company_id . '/' . $folder, $file_name);
-
-        // Prepare db path
-        $path = $folder . '/' . $file_name;
-
-        return $path;
-    }
-
     public function getMedia($file, $folder = 'settings', $company_id = null)
     {
         $path = '';
@@ -38,13 +17,15 @@ trait Uploads
             return $path;
         }
 
-        if (!$company_id) {
-            $company_id = company_id();
-        }
+        $path = $this->getMediaFolder($folder, $company_id);
 
-        $path = $company_id . '/' . $folder;
-
-        return MediaUploader::fromSource($file)->toDirectory($path)->upload();
+        return MediaUploader::makePrivate()
+                            ->beforeSave(function(MediaModel $media) {
+                                $media->company_id = company_id();
+                            })
+                            ->fromSource($file)
+                            ->toDirectory($path)
+                            ->upload();
     }
 
     public function importMedia($file, $folder = 'settings', $company_id = null, $disk = null)
@@ -55,13 +36,13 @@ trait Uploads
             $disk = config('mediable.default_disk');
         }
 
-        if (!$company_id) {
-            $company_id = company_id();
-        }
+        $path = $this->getMediaFolder($folder, $company_id) . '/' . basename($file);
 
-        $path = $company_id . '/' . $folder . '/' . basename($file);
-
-        return MediaUploader::importPath($disk, $path);
+        return MediaUploader::makePrivate()
+                            ->beforeSave(function(MediaModel $media) {
+                                $media->company_id = company_id();
+                            })
+                            ->importPath($disk, $path);
     }
 
     public function deleteMediaModel($model, $parameter, $request = null)
@@ -93,5 +74,55 @@ trait Uploads
 
             MediaModel::where('id', $media->id)->delete();
         }
+    }
+
+    public function getMediaFolder($folder, $company_id = null)
+    {
+        if (!$company_id) {
+            $company_id = company_id();
+        }
+
+        $date = Date::now()->format('Y/m/d');
+
+        // 2021/04/09/34235/invoices
+        return $date . '/' . $company_id . '/' . $folder;
+    }
+
+    public function getMediaPathOnStorage($media)
+    {
+        if (!is_object($media)) {
+            return false;
+        }
+
+        $path = $media->getDiskPath();
+
+        if (Storage::missing($path)) {
+            return false;
+        }
+
+        return $path;
+    }
+
+    public function streamMedia($media)
+    {
+        return response()->streamDownload(
+            function() use ($media) {
+                $stream = $media->stream();
+
+                while ($bytes = $stream->read(1024)) {
+                    echo $bytes;
+                }
+            },
+            $media->basename,
+            [
+                'Content-Type'      => $media->mime_type,
+                'Content-Length'    => $media->size,
+            ],
+        );
+    }
+
+    public function isLocalStorage()
+    {
+        return config('filesystems.disks.' . config('filesystems.default') . '.driver') == 'local';
     }
 }

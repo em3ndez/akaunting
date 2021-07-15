@@ -6,7 +6,7 @@ use App\Traits\Tenants;
 use App\Notifications\Auth\Reset;
 use App\Traits\Media;
 use App\Traits\Users;
-use Date;
+use App\Utilities\Date;
 use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -21,8 +21,6 @@ class User extends Authenticatable implements HasLocalePreference
     use HasFactory, LaratrustUserTrait, Notifiable, SearchString, SoftDeletes, Sortable, Media, Tenants, Users;
 
     protected $table = 'users';
-
-    protected $tenantable = false;
 
     /**
      * The attributes that are mass assignable.
@@ -178,7 +176,7 @@ class User extends Authenticatable implements HasLocalePreference
         $request = request();
 
         $search = $request->get('search');
-        $limit = $request->get('limit', setting('default.list_limit', '25'));
+        $limit = (int) $request->get('limit', setting('default.list_limit', '25'));
 
         return $query->usingSearchString($search)->sortable($sort)->paginate($limit);
     }

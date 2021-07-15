@@ -11,18 +11,22 @@ class CompaniesTest extends FeatureTestCase
         $this->loginAs()
             ->get(route('wizard.companies.edit'))
             ->assertStatus(200)
-            ->assertSeeText(trans('modules.api_key'));
+            ->assertSeeText(trans('general.wizard'));
     }
 
     public function testItShouldUpdateCompany()
     {
         $request = $this->getRequest();
 
-        $this->loginAs()
-            ->patch(route('wizard.companies.update'), $request)
-            ->assertStatus(200);
+        $message = trans('messages.success.updated', ['type' => trans_choice('general.companies', 2)]);
 
-        $this->assertFlashLevel('success');
+        $this->loginAs()
+            ->post(route('wizard.companies.update'), $request)
+            ->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'message' => $message,
+            ]);
     }
 
     public function getRequest()
@@ -31,7 +35,7 @@ class CompaniesTest extends FeatureTestCase
             'financial_start' => '01-04',
             'address' => $this->faker->address,
             'tax_number' => $this->faker->randomNumber(9),
-            'logo' => UploadedFile::fake()->create('image.jpg'),
+            'logo' => UploadedFile::fake()->image('akaunting-logo.jpg'),
         ];
     }
 }
