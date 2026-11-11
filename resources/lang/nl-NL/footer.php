@@ -3,8 +3,11 @@
 return [
 
     'version'               => 'Versie',
-    'powered'               => 'Mogelijk gemaakt door Akaunting',
+    'powered'               => 'Aangedreven door Akaunting',
     'link'                  => 'https://akaunting.com',
-    'software'              => 'Gratis boekhoudsoftware',
+    'software'              => 'Online boekhoudsoftware',
+    'powered_by'            => 'Aangedreven door',
+    'tag_line'              => 'Stuur facturen, volg uitgaven en automatiseer de boekhouding met Akaunting. :get_started_url',
+    'get_started'           => 'Aan de slag',
 
 ];

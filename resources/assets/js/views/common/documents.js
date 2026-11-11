@@ -1,20 +1,21 @@
 /**
- * First we will load all of this project's JavaScript dependencies which
- * includes Vue and other libraries. It is a great starting point when
- * building robust, powerful web applications using Vue and Laravel.
- */
-
+* First we will load all of this project's JavaScript dependencies which
+* includes Vue and other libraries. It is a great starting point when
+* building robust, powerful web applications using Vue and Laravel.
+*/
 require('./../../bootstrap');
-
 import Vue from 'vue';
 
 import DashboardPlugin from './../../plugins/dashboard-plugin';
-import { setPromiseTimeout } from './../../plugins/functions';
+import { addDays, format } from 'date-fns';
+import { setPromiseTimeout, calculationToQuantity, getQueryVariable } from './../../plugins/functions';
 
 import Global from './../../mixins/global';
 
 import Form from './../../plugins/form';
 import BulkAction from './../../plugins/bulk-action';
+import Money from './../../plugins/money';
+import draggable from 'vuedraggable';
 
 // plugin setup
 Vue.use(DashboardPlugin);
@@ -25,6 +26,10 @@ const app = new Vue({
     mixins: [
         Global
     ],
+
+    components: {
+        draggable
+    },
 
     data: function () {
         return {
@@ -67,43 +72,248 @@ const app = new Vue({
             },
             dropdown_visible: true,
             dynamic_taxes: [],
+            recalculate_taxes: false,
+            taxes_out_of_date: false,
+            tax_rate_note: '',
+            percent_position: 'after',
+            show_discount: false,
+            show_discount_text: true,
+            delete_discount: false,
+            regex_condition: [
+                '..',
+                '.,',
+                ',.',
+                ',,'
+            ],
+            email_template: false,
+            send_to: false,
         }
     },
 
     mounted() {
-        this.form.discount_type = 'percentage';
-
         if ((document.getElementById('items') != null) && (document.getElementById('items').rows)) {
             this.colspan = document.getElementById("items").rows[0].cells.length - 1;
         }
 
-        if (!this.edit.status) {
+        if (! this.edit.status) {
            this.dropdown_visible = false;
         }
 
         this.currency_symbol.rate = this.form.currency_rate;
 
         if (company_currency_code) {
-           let default_currency_symbol = null;
+            let default_currency_symbol = null;
+            let default_currency = this.currency_symbol;
 
-           for (let symbol of this.currencies) {
-               if(symbol.code == company_currency_code) {
-                   default_currency_symbol = symbol.symbol;
-               }
-           }
+            for (let currency of this.currencies) {
+                if (currency.code == company_currency_code) {
+                    default_currency = currency;
+                    default_currency_symbol = currency.symbol;
+                }
+            }
 
-           this.currency_symbol.symbol = default_currency_symbol;
+            this.currency_symbol = default_currency;
         };
+
+        if (document_app_env == 'production') {
+           this.onFormCapture();
+        }
     },
 
     methods: {
-        onRefFocus(ref) {
-            let index = this.form.items.length - 1;  
+        onChangeCurrencyPaymentAccount(currency_code) {
+            let code = currency_code;
+            let rate = this.form.currency_rate;
+            let precision = this.currency.precision;
 
-            this.$refs['items-' + index + '-'  + ref][0].focus();
+            let amount = parseFloat(this.form.amount).toFixed(precision);
+            let paid_amount = parseFloat(this.form.paid_amount).toFixed(precision);
+            let total_amount = parseFloat(this.form.document_default_amount).toFixed(precision);
+            let error_amount = 0;
+
+            if (this.form.document_currency_code != code) {
+                let converted_amount = this.convertBetween(amount, code, rate, this.form.document_currency_code, this.form.document_currency_rate);
+
+                amount = parseFloat(converted_amount).toFixed(precision);
+
+                // for default rate 1 and change currency rate 30
+                if (parseFloat(amount) > parseFloat(total_amount) || (rate >= 1)) {
+                    error_amount = total_amount;
+
+                    if (this.form.document_currency_code != code) {
+                        let converted_amount = this.convertBetween(total_amount, this.form.document_currency_code, this.form.document_currency_rate, code, rate);
+
+                        error_amount = parseFloat(converted_amount).toFixed(precision);
+                    }
+                }
+            }
+
+            this.form.pay_in_full = true;
+
+            let form_amount = (error_amount) ? error_amount : amount;
+
+            this.form.amount = parseFloat(form_amount).toFixed(precision);
+            this.form.default_amount = parseFloat(this.form.document_default_amount).toFixed(precision);
+        },
+
+        onChangeAmount(amount) {
+            if (this.form == undefined) {
+                return;
+            }
+
+            if (this.form.document_currency_code == this.form.currency_code) {
+                return;
+            }
+
+            let code = this.form.currency_code;
+            let rate = this.form.currency_rate;
+            let precision = this.currency.precision;
+
+            let paid_amount = parseFloat(this.form.paid_amount).toFixed(precision);
+            let total_amount = parseFloat(this.form.document_default_amount).toFixed(precision);
+            let error_amount = 0;
+
+            if (this.form.document_currency_code != code) {
+                let converted_amount = this.convertBetween(amount, code, rate, this.form.document_currency_code, this.form.document_currency_rate);
+
+                amount = parseFloat(converted_amount).toFixed(precision);
+
+                if (parseFloat(amount) > parseFloat(total_amount)) {
+                    error_amount = total_amount;
+
+                    if (this.form.document_currency_code != code) {
+                        let converted_amount = this.convertBetween(total_amount, this.form.document_currency_code, this.form.document_currency_rate, code, rate);
+
+                        error_amount = parseFloat(converted_amount).toFixed(precision);
+                    }
+                }
+
+                this.form.default_amount = amount;
+            }
+        },
+
+        onChangeRatePayment(event) {
+            this.$forceUpdate();
+
+            this.form.currency_rate = event.target.value;
+
+            this.onChangeAmount(this.form.amount);
+        },
+
+        onChangePayInFull(event) {
+            this.$forceUpdate();
+
+            if (! event) {
+                return;
+            }
+
+            let document_rate = parseFloat(this.form.document_currency_rate) / parseFloat(this.form.document_default_amount);
+
+            let rate = parseFloat(document_rate * this.form.amount).toFixed(4);
+
+            this.form.currency_rate = parseFloat(rate);
+
+            this.onChangeAmount(this.form.amount);
+        },
+
+        checkAmount() {
+            let code = this.form.currency_code;
+            let rate = this.form.currency_rate;
+            let precision = this.currency.precision;
+            let amount = parseFloat(this.form.amount).toFixed(precision);
+            let paid_amount = parseFloat(this.form.paid_amount).toFixed(precision);
+            let total_amount = parseFloat(this.form.document_default_amount).toFixed(precision); 
+            let error_amount = 0;
+
+            if (this.form.document_currency_code != code) {
+                let converted_amount = this.convertBetween(amount, code, rate, this.form.document_currency_code, this.form.document_currency_rate);
+
+                amount = parseFloat(converted_amount).toFixed(precision);
+            }
+
+            if (parseFloat(amount) > parseFloat(total_amount)) {
+                error_amount = total_amount;
+
+                if (this.form.document_currency_code != code) {
+                    let converted_amount = this.convertBetween(total_amount, this.form.document_currency_code, this.form.document_currency_rate, code, rate);
+
+                    error_amount = parseFloat(converted_amount).toFixed(precision);
+                }
+            }
+
+            return (error_amount) ? error_amount : false; 
+        },
+
+        // format default = false 
+        convert(method, amount, from, to, rate, format) {
+            let money = new Money(to, amount, format);
+
+            // No need to convert same currency
+            if (from == to) {
+                return format ? money.format() : money.getAmount();
+            }
+
+            try {
+                money = money[method](parseFloat(rate));
+            } catch ( $e) {
+                console.log($e);
+
+                return 0;
+            }
+
+            return format ? money.format() : money.getAmount();
+        },
+
+        // format default = false default = null
+        convertToDefault(amount, from, rate, format, ddefault) {
+            let default_currency = (ddefault) ? ddefault : this.form.company_currency_code;
+
+            return this.convert('divide', amount, from, default_currency, rate, format);
+        },
+
+        // format default = false default = null
+        convertFromDefault(amount, to, rate, format, ddefault) {
+            let default_currency = (ddefault) ? ddefault : this.form.company_currency_code;
+
+            return this.convert('multiply', amount, default_currency, to, rate, format);
+        },
+
+        convertBetween(amount, from_code, from_rate, to_code, to_rate) {
+            let default_amount = amount;
+
+            if (from_code != this.form.company_currency_code) {
+                default_amount = this.convertToDefault(amount, from_code, from_rate, false, null);
+            }
+
+            let converted_amount = this.convertFromDefault(default_amount, to_code, to_rate, false, null);
+
+            return converted_amount;
+        },
+
+        onItemSortUpdate(event) {
+            let item_index = this.form.items.indexOf(this.form.items[event.oldIndex]);
+            let item = this.form.items.splice(item_index, 1)[0];
+
+            this.form.items.splice(event.newIndex, 0, item);
+        },
+
+        onRefFocus(ref) {
+            let index = this.form.items.length - 1;
+
+            if (typeof (this.$refs['items-' + index + '-' + ref]) !== 'undefined') {
+                let first_ref = this.$refs['items-' + index + '-'  + ref];
+
+                if (first_ref != undefined) {
+                    first_ref[0].focus();
+                } else if (this.$refs[Object.keys(this.$refs)[0]] != undefined) {
+                    this.$refs[Object.keys(this.$refs)[0]][0].focus();
+                }
+            }
         },
 
         onCalculateTotal() {
+            this.taxes_out_of_date = false;
+
             let global_discount = parseFloat(this.form.discount);
             let total_discount = 0;
             let line_item_discount_total = 0;
@@ -114,7 +324,7 @@ const app = new Vue({
 
             // items calculate
             this.items.forEach(function(item, index) {
-                item.total = item.grand_total = item.price * item.quantity;
+                item.total = item.grand_total = item.price * calculationToQuantity(item.quantity);
 
                 let item_discounted_total = items_amount[index];
 
@@ -142,17 +352,30 @@ const app = new Vue({
 
                 this.calculateItemTax(item, totals_taxes, total_discount + line_discount_amount);
 
-                item.total = item.price * item.quantity;
+                item.total = item.price * calculationToQuantity(item.quantity);
 
                 // calculate sub, tax, discount all items.
                 line_item_discount_total += line_discount_amount;
                 sub_total += item.total;
                 grand_total += item.grand_total;
 
+                let item_tax_ids = [];
+                let item_tax_rates = {};
+
+                item.tax_ids.forEach(function(item_tax, item_tax_index) {
+                    item_tax_ids.push(item_tax.id);
+
+                    if (item_tax.rate !== undefined && item_tax.rate !== null) {
+                        item_tax_rates[item_tax.id] = item_tax.rate;
+                    }
+                });
+
                 this.form.items[index].name = item.name;
                 this.form.items[index].description = item.description;
                 this.form.items[index].quantity = item.quantity;
                 this.form.items[index].price = item.price;
+                this.form.items[index].tax_ids = item_tax_ids;
+                this.form.items[index].tax_rates = item_tax_rates;
                 this.form.items[index].discount = item.discount;
                 this.form.items[index].discount_type = item.discount_type;
                 this.form.items[index].total = item.total;
@@ -181,6 +404,57 @@ const app = new Vue({
             this.currencyConversion();
         },
 
+        // Picking a different tax means the line is no longer charged at the
+        // previous tax's rate, so drop it and let the new tax's rate apply.
+        onChangeTaxRow(row_tax, tax_id) {
+            // Some select components emit the current value on mount. Only
+            // clear the charged rate when the selected tax actually changes.
+            if (String(row_tax.id) === String(tax_id)) {
+                return;
+            }
+
+            row_tax.id = tax_id;
+            row_tax.rate = null;
+
+            // The rate kept for the recalculate toggle belonged to the previous
+            // tax, so undoing the toggle must not bring it back on this row.
+            row_tax.original_rate = undefined;
+        },
+
+        // True when the line was charged at a rate the tax no longer has, which is
+        // what the hint next to the line explains.
+        taxRateChanged(row_tax) {
+            if (! row_tax || row_tax.rate === undefined || row_tax.rate === null) {
+                return false;
+            }
+
+            let tax = this.dynamic_taxes.find(function (item) {
+                return item.id == row_tax.id;
+            });
+
+            return !! tax && parseFloat(tax.rate) !== parseFloat(row_tax.rate);
+        },
+
+        // Mirrors Tax::getTitleAttribute() so the charged rate reads the same
+        // way the tax's own title does elsewhere (fixed taxes have no %).
+        formatTaxRate(row_tax) {
+            // The type belongs to the tax, not to the charged row, so it has to be
+            // looked up. Without this a fixed tax would read as a percentage.
+            let tax = this.dynamic_taxes.find(function (item) {
+                return item.id == row_tax.id;
+            });
+
+            if (tax && tax.type === 'fixed') {
+                return row_tax.rate;
+            }
+
+            return (this.percent_position === 'before') ? ('%' + row_tax.rate) : (row_tax.rate + '%');
+        },
+
+        taxRateNote(row_tax) {
+            return (this.tax_rate_note || '').replace(':rate', this.formatTaxRate(row_tax));
+        },
+
         calculateItemTax(item, totals_taxes, total_discount_amount) {
             let taxes = this.dynamic_taxes;
 
@@ -202,13 +476,26 @@ const app = new Vue({
                             continue;
                         }
 
+                        // Prefer the rate this document was charged at so that merely
+                        // opening the form does not reprice existing taxes. A line that
+                        // has no charged rate yet uses the tax's current rate.
+                        let charged_rate = (item_tax.rate !== undefined && item_tax.rate !== null)
+                            ? parseFloat(item_tax.rate)
+                            : tax.rate;
+
+                        item_tax.rate = charged_rate;
+
+                        if (parseFloat(charged_rate) !== parseFloat(tax.rate)) {
+                            this.taxes_out_of_date = true;
+                        }
+
                         switch (tax.type) {
                             case 'inclusive':
                                 inclusives.push({
                                     tax_index: item_tax_index,
                                     tax_id: tax.id,
                                     tax_name: tax.title,
-                                    tax_rate: tax.rate
+                                    tax_rate: charged_rate
                                 });
                                 break;
                             case 'compound':
@@ -216,7 +503,7 @@ const app = new Vue({
                                     tax_index: item_tax_index,
                                     tax_id: tax.id,
                                     tax_name: tax.title,
-                                    tax_rate: tax.rate
+                                    tax_rate: charged_rate
                                 });
                                 break;
                             case 'fixed':
@@ -224,7 +511,7 @@ const app = new Vue({
                                     tax_index: item_tax_index,
                                     tax_id: tax.id,
                                     tax_name: tax.title,
-                                    tax_rate: tax.rate
+                                    tax_rate: charged_rate
                                 });
                                 break;
                             case 'withholding':
@@ -232,7 +519,7 @@ const app = new Vue({
                                     tax_index: item_tax_index,
                                     tax_id: tax.id,
                                     tax_name: tax.title,
-                                    tax_rate: tax.rate
+                                    tax_rate: charged_rate
                                 });
                                 break;
                             default:
@@ -240,7 +527,7 @@ const app = new Vue({
                                     tax_index: item_tax_index,
                                     tax_id: tax.id,
                                     tax_name: tax.title,
-                                    tax_rate: tax.rate
+                                    tax_rate: charged_rate
                                 });
                                 break;
                         }
@@ -248,12 +535,19 @@ const app = new Vue({
                 }, this);
 
                 if (inclusives.length) {
+                    // The price carries every inclusive tax at once, so the amount without
+                    // them is found with the rates added up. Taking each rate out of the
+                    // full price on its own charges the same money twice.
+                    let inclusive_rate_total = inclusives.reduce((total, inclusive) => total + parseFloat(inclusive.tax_rate), 0);
+                    let amount_without_inclusives = item.grand_total / (1 + inclusive_rate_total / 100);
+
                     inclusives.forEach(function(inclusive) {
-                        item.tax_ids[inclusive.tax_index].price = item.grand_total - (item.grand_total / (1 + inclusive.tax_rate / 100));
+                        item.tax_ids[inclusive.tax_index].name = inclusive.tax_name;
+                        item.tax_ids[inclusive.tax_index].price = this.numberFormat(amount_without_inclusives * (inclusive.tax_rate / 100), this.currency.precision);
 
                         inclusive_tax_total += item.tax_ids[inclusive.tax_index].price;
 
-                        totals_taxes = this.calculateTotalsTax(totals_taxes, inclusive.tax_id, inclusive.tax_name, inclusive.tax_type, item.tax_ids[inclusive.tax_index].price);
+                        totals_taxes = this.calculateTotalsTax(totals_taxes, inclusive.tax_id, inclusive.tax_name, item.tax_ids[inclusive.tax_index].price);
                     }, this);
 
                     item.total = parseFloat(item.grand_total - inclusive_tax_total);
@@ -261,11 +555,12 @@ const app = new Vue({
 
                 if (fixed.length) {
                     fixed.forEach(function(fixed) {
-                        item.tax_ids[fixed.tax_index].price = fixed.tax_rate * item.quantity;
+                        item.tax_ids[fixed.tax_index].name = fixed.tax_name;
+                        item.tax_ids[fixed.tax_index].price = this.numberFormat(fixed.tax_rate * calculationToQuantity(item.quantity), this.currency.precision);
 
                         total_tax_amount += item.tax_ids[fixed.tax_index].price;
 
-                        totals_taxes = this.calculateTotalsTax(totals_taxes, fixed.tax_id, fixed.tax_name, fixed.tax_type, item.tax_ids[fixed.tax_index].price);
+                        totals_taxes = this.calculateTotalsTax(totals_taxes, fixed.tax_id, fixed.tax_name, item.tax_ids[fixed.tax_index].price);
                     }, this);
                 }
 
@@ -277,34 +572,46 @@ const app = new Vue({
 
                 if (normal.length) {
                     normal.forEach(function(normal) {
-                        item.tax_ids[normal.tax_index].price = price_for_tax * (normal.tax_rate / 100);
+                        item.tax_ids[normal.tax_index].name = normal.tax_name;
+                        item.tax_ids[normal.tax_index].price = this.numberFormat((price_for_tax * (normal.tax_rate / 100)), this.currency.precision);
 
                         total_tax_amount += item.tax_ids[normal.tax_index].price;
 
-                        totals_taxes = this.calculateTotalsTax(totals_taxes, normal.tax_id, normal.tax_name, normal.tax_type, item.tax_ids[normal.tax_index].price);
+                        totals_taxes = this.calculateTotalsTax(totals_taxes, normal.tax_id, normal.tax_name, item.tax_ids[normal.tax_index].price);
                     }, this);
                 }
 
                 if (withholding.length) {
                     withholding.forEach(function(withholding) {
-                        item.tax_ids[withholding.tax_index].price = -(price_for_tax * (withholding.tax_rate / 100));
+                        item.tax_ids[withholding.tax_index].name = withholding.tax_name;
+                        item.tax_ids[withholding.tax_index].price = -this.numberFormat((price_for_tax * (withholding.tax_rate / 100)), this.currency.precision);
 
                         total_tax_amount += item.tax_ids[withholding.tax_index].price;
 
-                        totals_taxes = this.calculateTotalsTax(totals_taxes, withholding.tax_id, withholding.tax_name, withholding.tax_type, item.tax_ids[withholding.tax_index].price);
+                        totals_taxes = this.calculateTotalsTax(totals_taxes, withholding.tax_id, withholding.tax_name, item.tax_ids[withholding.tax_index].price);
                     }, this);
                 }
 
                 item.grand_total += total_tax_amount;
 
                 if (compounds.length) {
+                    // A compound tax is charged on the price and the other taxes, not on
+                    // another compound tax, so every compound is worked out on the same
+                    // amount. Charging one on top of the other would also make each row
+                    // depend on the order the taxes happen to be in.
+                    let amount_before_compounds = item.grand_total;
+                    let compound_tax_total = 0;
+
                     compounds.forEach(function(compound) {
-                        item.tax_ids[compound.tax_index].price = (item.grand_total / 100) * compound.tax_rate;
+                        item.tax_ids[compound.tax_index].name = compound.tax_name;
+                        item.tax_ids[compound.tax_index].price = this.numberFormat((amount_before_compounds / 100) * compound.tax_rate, this.currency.precision);
 
-                        totals_taxes = this.calculateTotalsTax(totals_taxes, compound.tax_id, compound.tax_name, compound.tax_type, item.tax_ids[compound.tax_index].price);
+                        compound_tax_total += item.tax_ids[compound.tax_index].price;
 
-                        item.grand_total += item.tax_ids[compound.tax_index].price;
+                        totals_taxes = this.calculateTotalsTax(totals_taxes, compound.tax_id, compound.tax_name, item.tax_ids[compound.tax_index].price);
                     }, this);
+
+                    item.grand_total += compound_tax_total;
                 }
 
                 if (inclusives.length) {
@@ -320,7 +627,7 @@ const app = new Vue({
             this.items.forEach(function(item, index) {
                 let item_total = 0;
 
-                item_total = item.price * item.quantity;
+                item_total = item.price * calculationToQuantity(item.quantity);
 
                 // item discount calculate.
                 if (item.discount) {
@@ -350,7 +657,7 @@ const app = new Vue({
             return amount_before_discount_and_tax;
         },
 
-        calculateTotalsTax(totals_taxes, id, name, type, price) {
+        calculateTotalsTax(totals_taxes, id, name, price) {
             let total_tax_index = totals_taxes.findIndex(total_tax => {
                 if (total_tax.id === id) {
                   return true;
@@ -380,7 +687,7 @@ const app = new Vue({
             let inputRef = `${itemType === 'newItem' ? 'name' : 'description'}`; // indication for which input to focus first
             let total = 1 * item.price;
             let item_taxes = [];
-            
+
             if (item.tax_ids) {
                 item.tax_ids.forEach(function (tax_id, index) {
                     if (this.taxes.includes(tax_id)) {
@@ -415,7 +722,7 @@ const app = new Vue({
                 description: item.description,
                 quantity: 1,
                 price: item.price,
-                add_tax: (document.getElementById('invoice-item-discount-rows') != null) ? false : true,
+                add_tax: false,
                 tax_ids: item_taxes,
                 add_discount: false,
                 discount: 0,
@@ -435,7 +742,7 @@ const app = new Vue({
         },
 
         onSelectedTax(item_index) {
-            if (!this.tax_id) {
+            if (! this.tax_id || this.tax_id == '') {
                 return;
             }
 
@@ -447,22 +754,25 @@ const app = new Vue({
                 }
             }, this);
 
-            this.items[item_index].tax_ids.push({
-                id: selected_tax.id,
-                name: selected_tax.title,
-                price: 0
-            });
+            if (selected_tax) {
+                this.items[item_index].tax_ids.push({
+                    id: selected_tax.id,
+                    name: selected_tax.title,
+                    price: 0
+                });
 
-            this.form.items[item_index].tax_ids.push(this.tax_id);
+                this.form.items[item_index].tax_ids.push(this.tax_id);
 
-            if (this.taxes.includes(this.tax_id)) {
-                this.taxes[this.tax_id].push(this.items[item_index].item_id);
-            } else {
-                this.taxes[this.tax_id] = [];
-                this.taxes[this.tax_id].push(this.items[item_index].item_id);
+                if (this.taxes.includes(this.tax_id)) {
+                    this.taxes[this.tax_id].push(this.items[item_index].item_id);
+                } else {
+                    this.taxes[this.tax_id] = [];
+                    this.taxes[this.tax_id].push(this.items[item_index].item_id);
+                }
             }
 
             this.tax_id = '';
+            this.items[item_index].add_tax = false;
 
             this.onCalculateTotal();
         },
@@ -482,11 +792,14 @@ const app = new Vue({
 
         onChangeDiscountType(type) {
             this.form.discount_type = type;
+
+            this.onAddTotalDiscount();
             this.onCalculateTotal();
         },
 
         onChangeLineDiscountType(item_index, type) {
             this.items[item_index].discount_type = type;
+
             this.onCalculateTotal();
         },
 
@@ -518,11 +831,32 @@ const app = new Vue({
         onDeleteDiscount(item_index) {
             this.items[item_index].add_discount = false;
             this.items[item_index].discount = 0;
+
             this.onCalculateTotal();
         },
 
         onAddTax(item_index) {
             this.items[item_index].add_tax = true;
+        },
+
+        onAddDiscount() {
+            this.show_discount = ! this.show_discount;
+
+            if (this.show_discount) {
+                this.show_discount_text = false;
+                this.delete_discount = true;
+            }
+        },
+
+        onRemoveDiscountArea() {
+            this.show_discount = false;
+            this.show_discount_text = true;
+            this.discount = false;
+            this.delete_discount = false;
+
+            this.form.discount = 0;
+
+            this.onCalculateTotal();
         },
 
         onDeleteTax(item_index, tax_index) {
@@ -542,128 +876,17 @@ const app = new Vue({
             this.form.items[item_index][field_name] = this.items[item_index][field_name];
         },
 
-        async onPayment() {
-            let document_id = document.getElementById('document_id').value;
+        onEmailViaTemplate(route, template) {
+            this.email_template = template;
 
-            let payment = {
-                modal: false,
-                url: url + '/modals/documents/' + document_id + '/transactions/create',
-                title: '',
-                html: '',
-                buttons:{}
-            };
-
-            let payment_promise = Promise.resolve(window.axios.get(payment.url));
-
-            payment_promise.then(response => {
-                payment.modal = true;
-                payment.title = response.data.data.title;
-                payment.html = response.data.html;
-                payment.buttons = response.data.data.buttons;
-
-                this.component = Vue.component('add-new-component', (resolve, reject) => {
-                    resolve({
-                        template: '<div id="dynamic-payment-component"><akaunting-modal-add-new modal-dialog-class="modal-md" :show="payment.modal" @submit="onSubmit" @cancel="onCancel" :buttons="payment.buttons" :title="payment.title" :is_component=true :message="payment.html"></akaunting-modal-add-new></div>',
-
-                        mixins: [
-                            Global
-                        ],
-
-                        data: function () {
-                            return {
-                                form:{},
-                                payment: payment,
-                            }
-                        },
-
-                        methods: {
-                            onSubmit(event) {
-                                this.form = event;
-
-                                this.form.response = {};
-
-                                this.loading = true;
-
-                                let data = this.form.data();
-
-                                FormData.prototype.appendRecursive = function(data, wrapper = null) {
-                                    for(var name in data) {
-                                        if (wrapper) {
-                                            if ((typeof data[name] == 'object' || data[name].constructor === Array) && ((data[name] instanceof File != true ) && (data[name] instanceof Blob != true))) {
-                                                this.appendRecursive(data[name], wrapper + '[' + name + ']');
-                                            } else {
-                                                this.append(wrapper + '[' + name + ']', data[name]);
-                                            }
-                                        } else {
-                                            if ((typeof data[name] == 'object' || data[name].constructor === Array) && ((data[name] instanceof File != true ) && (data[name] instanceof Blob != true))) {
-                                                this.appendRecursive(data[name], name);
-                                            } else {
-                                                this.append(name, data[name]);
-                                            }
-                                        }
-                                    }
-                                };
-
-                                let form_data = new FormData();
-                                form_data.appendRecursive(data);
-
-                                window.axios({
-                                    method: this.form.method,
-                                    url: this.form.action,
-                                    data: form_data,
-                                    headers: {
-                                        'X-CSRF-TOKEN': window.Laravel.csrfToken,
-                                        'X-Requested-With': 'XMLHttpRequest',
-                                        'Content-Type': 'multipart/form-data'
-                                    }
-                                })
-                                .then(response => {
-                                    if (response.data.success) {
-                                        if (response.data.redirect) {
-                                            this.form.loading = true;
-
-                                            window.location.href = response.data.redirect;
-                                        }
-                                    }
-
-                                    if (response.data.error) {
-                                        this.form.loading = false;
-
-                                        this.form.response = response.data;
-                                    }
-                                })
-                                .catch(error => {
-                                    this.form.loading = false;
-
-                                    this.form.onFail(error);
-
-                                    this.method_show_html = error.message;
-                                });
-                            },
-
-                            onCancel() {
-                                this.payment.modal = false;
-                                this.payment.html = null;
-
-                                let documentClasses = document.body.classList;
-
-                                documentClasses.remove("modal-open");
-                            },
-                        }
-                    })
-                });
-            })
-            .catch(error => {
-            })
-            .finally(function () {
-                // always executed
-            });
+            this.onSendEmail(route);
         },
 
         // Change currency get money
         onChangeCurrency(currency_code) {
             if (this.edit.status && this.edit.currency <= 2) {
                 this.edit.currency++;
+
                 return;
             }
 
@@ -710,7 +933,61 @@ const app = new Vue({
                     }
                 }
             }, 250);
-        }
+        },
+
+        onBeforeUnload() {
+            window.onbeforeunload = function() {
+                return 'Are you sure you want to leave this page';
+            };
+        },
+
+        onFormCapture() {
+           let form_html = document.querySelector('form');
+
+           if (form_html && form_html.getAttribute('id') == 'document') {
+               form_html.querySelectorAll('input, textarea, select, ul, li, a').forEach((element) => {
+                  element.addEventListener('click', () => {
+                      this.onBeforeUnload();
+                  });
+               });
+
+               form_html.querySelectorAll('[type="submit"]').forEach((submit) => {
+                   submit.addEventListener('click', () => {
+                        window.onbeforeunload = null;
+                   });
+               });
+
+               form_html.querySelectorAll('[type="button"]').forEach((button) => {
+                button.addEventListener('click', () => {
+                     window.onbeforeunload = null;
+                });
+            });
+           }
+        },
+
+        onChangeRecurringDate() {
+            let started_at = new Date(this.form.recurring_started_at);
+            let due_at = format(addDays(started_at, this.form.payment_terms), 'yyyy-MM-dd');
+
+            this.form.due_at = due_at;
+        },
+
+        onSubmitViaSendEmail() {
+            this.form['senddocument'] = true;
+            this.send_to = true;
+
+            this.onSubmit();
+        },
+
+        numberFormat(number, decimals = 0) {
+            number = parseFloat(number);
+
+            if (isNaN(number)) return parseFloat('0');
+
+            number = number.toFixed(decimals);
+
+            return parseFloat(number);
+        },
     },
 
     created() {
@@ -721,17 +998,28 @@ const app = new Vue({
             this.edit.currency = 1;
 
             document_items.forEach(function(item) {
+                let form_item_tax_rates = {};
+
+                if (item.taxes) {
+                    item.taxes.forEach(function (item_tax) {
+                        if (item_tax.rate !== undefined && item_tax.rate !== null) {
+                            form_item_tax_rates[item_tax.tax_id] = item_tax.rate;
+                        }
+                    });
+                }
+
                 // form set item
                 this.form.items.push({
                     item_id: item.item_id,
                     name: item.name,
                     description: item.description === null ? "" : item.description,
                     quantity: item.quantity,
-                    price: (item.price).toFixed(2),
+                    price: (item.price).toFixed(this.currency.precision ?? 2),
                     tax_ids: item.tax_ids,
+                    tax_rates: form_item_tax_rates,
                     discount: item.discount_rate,
                     discount_type: item.discount_type,
-                    total: (item.total).toFixed(2)
+                    total: (item.total).toFixed(this.currency.precision ?? 2)
                 });
 
                 if (item.tax_ids) {
@@ -754,22 +1042,24 @@ const app = new Vue({
                     item_taxes.push({
                         id: item_tax.tax_id,
                         name: item_tax.name,
-                        price: (item_tax.amount).toFixed(2),
+                        rate: item_tax.rate,
+                        type: item_tax.type,
+                        price: (item_tax.amount).toFixed(this.currency.precision ?? 2),
                     });
-                });
+                }, this);
 
                 this.items.push({
                     item_id: item.item_id,
                     name: item.name,
                     description: item.description === null ? "" : item.description,
                     quantity: item.quantity,
-                    price: (item.price).toFixed(2),
-                    add_tax: (!item_taxes.length && document.getElementById('invoice-item-discount-rows') != null) ? false : true,
+                    price: (item.price).toFixed(this.currency.precision ?? 2),
+                    add_tax: false,
                     tax_ids: item_taxes,
                     add_discount: (item.discount_rate) ? true : false,
                     discount: item.discount_rate,
                     discount_type: item.discount_type,
-                    total: (item.total).toFixed(2),
+                    total: (item.total).toFixed(this.currency.precision ?? 2),
                     // @todo
                     // invoice_item_checkbox_sample: [],
                 });
@@ -796,8 +1086,6 @@ const app = new Vue({
             }, this);
         }
 
-        this.page_loaded = true;
-
         if (typeof document_currencies !== 'undefined' && document_currencies) {
             this.currencies = document_currencies;
 
@@ -812,6 +1100,131 @@ const app = new Vue({
 
         if (typeof document_taxes !== 'undefined' && document_taxes) {
             this.dynamic_taxes = document_taxes;
+
+            if (typeof document_tax_rate_note !== 'undefined' && document_tax_rate_note) {
+                this.tax_rate_note = document_tax_rate_note;
+            }
+
+            if (typeof document_percent_position !== 'undefined' && document_percent_position) {
+                this.percent_position = document_percent_position;
+            }
         }
-    }
+
+        if (getQueryVariable('senddocument')) {
+            // clear query string
+            let uri = window.location.toString();
+
+            if (uri.indexOf("?") > 0) {
+                let clean_uri = uri.substring(0, uri.indexOf("?"));
+
+                window.history.replaceState({}, document.title, clean_uri);
+            }
+
+            let email_route = document.getElementById('senddocument_route').value;
+
+            this.onSendEmail(email_route);
+        }
+
+        if (getQueryVariable('sendtransaction')) {
+            // clear query string
+            let uri = window.location.toString();
+
+            if (uri.indexOf("?") > 0) {
+                let clean_uri = uri.substring(0, uri.indexOf("?"));
+
+                window.history.replaceState({}, document.title, clean_uri);
+            }
+
+            let email_route = document.getElementById('sendtransaction_route').value;
+            let email_template = document.getElementById('sendtransaction_template').value;
+
+            this.onEmailViaTemplate(email_route, email_template);
+        }
+
+        // This line added edit document has discount show discount area
+        if (this.form.discount > 0) {
+            this.onAddDiscount();
+        }
+
+        if (this.edit.status) {
+            this.onCalculateTotal();
+        }
+
+        this.page_loaded = true;
+    },
+
+    watch: {
+        recalculate_taxes: function (value) {
+            this.form.recalculate_taxes = value ? '1' : '';
+
+            this.items.forEach(function (item) {
+                if (! item.tax_ids) {
+                    return;
+                }
+
+                item.tax_ids.forEach(function (item_tax) {
+                    // Keeping the previous rate on the row itself survives lines
+                    // being reordered or removed, which an index based key does not.
+                    if (value) {
+                        if (item_tax.original_rate === undefined) {
+                            item_tax.original_rate = item_tax.rate;
+                        }
+
+                        // Dropping the charged rate makes the current one apply
+                        item_tax.rate = null;
+                    } else if (item_tax.original_rate !== undefined) {
+                        item_tax.rate = item_tax.original_rate;
+                    }
+                }, this);
+            }, this);
+
+            this.onCalculateTotal();
+        },
+
+        'form.discount': function (newVal, oldVal) {
+            if (typeof newVal !== 'string') {
+                return;
+            }
+
+            if (newVal != '' && newVal.search('^(?=.*?[0-9])[0-9.,]+$') !== 0) {
+                this.form.discount = oldVal;
+
+                if (Number(newVal) == null) {
+                    this.form.discount.replace(',', '.');
+                }
+
+                return;
+            }
+
+            for (let item of this.regex_condition) {
+                if (this.form.discount && this.form.discount.includes(item)) {
+                    const removeLastChar  = newVal.length - 1;
+                    const inputShown = newVal.slice(0, removeLastChar);
+
+                    this.form.discount = inputShown;
+                }
+            }
+
+           this.form.discount.replace(',', '.');
+        },
+
+        'items': {
+            handler(newItems, oldItems) {
+                const regex = /^[0-9+\-x*\/().\s]+$/;
+
+                newItems.forEach((item, index) => {
+                    if (item.quantity && ! regex.test(item.quantity)) {
+                        item.quantity = item.quantity.replace(/[^0-9+\-x*\/().\s]/g, "");
+                    }
+                });
+            },
+            deep: true,
+        },
+
+        'form.loading': function (newVal, oldVal) {
+            if (! newVal) {
+                this.send_to = false;
+            }
+        },
+    },
 });

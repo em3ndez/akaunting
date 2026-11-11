@@ -2,17 +2,29 @@
 
 namespace Tests\Feature\Purchases;
 
-use App\Exports\Purchases\Bills as Export;
+use App\Exports\Purchases\Bills\Bills as Export;
 use App\Jobs\Document\CreateDocument;
+use App\Jobs\Document\UpdateDocument;
+use App\Models\Banking\Transaction;
+use App\Models\Common\Contact;
 use App\Models\Document\Document;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Facades\Excel;
 use Tests\Feature\FeatureTestCase;
 
 class BillsTest extends FeatureTestCase
 {
+    public function testItShouldUseVendorPaymentTemplateForBillPayments()
+    {
+        $email_template = config('type.document.' . Document::BILL_TYPE . '.transaction.email_template');
+
+        $this->assertEquals('payment_made_vendor', $email_template);
+        $this->assertNotEquals('invoice_payment_customer', $email_template);
+    }
+
     public function testItShouldSeeBillListPage()
     {
         $this->loginAs()
@@ -56,6 +68,26 @@ class BillsTest extends FeatureTestCase
         ]);
     }
 
+    public function testItShouldNotCreateBillWithInvalidRelationsThroughApi()
+    {
+        $request = $this->getRequest();
+        $request['contact_id'] = 99999;
+        $request['category_id'] = 99999;
+
+        $this->withExceptionHandling()
+            ->withHeaders([
+                'Authorization' => 'Basic ' . base64_encode('test@company.com:123456'),
+            ])
+            ->postJson(route('api.documents.store', ['search' => 'type:bill']), $request)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors([
+                'contact_id' => trans('validation.exists', ['attribute' => 'contact id']),
+                'category_id' => trans('validation.exists', ['attribute' => 'category id']),
+            ]);
+
+        $this->assertDatabaseMissing('documents', ['document_number' => $request['document_number']]);
+    }
+
     public function testItShouldCreateBillWithAttachment()
     {
         Storage::fake('uploads');
@@ -83,10 +115,12 @@ class BillsTest extends FeatureTestCase
         $this->assertDatabaseHas('documents', [
             'document_number' => $request['document_number']
         ]);
+
         $this->assertDatabaseHas('mediables', [
             'mediable_type' => Document::class,
             'tag'           => 'attachment',
         ]);
+
         $this->assertDatabaseHas('media', [
             'disk'           => 'uploads',
             'directory'      => '2021/05/15/1/bills',
@@ -102,12 +136,13 @@ class BillsTest extends FeatureTestCase
         $request = $this->getRequest(true);
 
         $this->loginAs()
-            ->post(route('bills.store'), $request)
+            ->post(route('recurring-bills.store'), $request)
             ->assertStatus(200);
 
         $this->assertFlashLevel('success');
 
         $this->assertDatabaseHas('documents', [
+            'type' => Document::BILL_RECURRING_TYPE,
             'document_number' => $request['document_number'],
         ]);
     }
@@ -135,7 +170,7 @@ class BillsTest extends FeatureTestCase
         $this->loginAs()
             ->patch(route('bills.update', $bill->id), $request)
             ->assertStatus(200)
-			->assertSee($request['contact_email']);
+            ->assertSee($request['contact_email']);
 
         $this->assertFlashLevel('success');
 
@@ -167,16 +202,16 @@ class BillsTest extends FeatureTestCase
         $count = 5;
         Document::factory()->bill()->count($count)->create();
 
-        \Excel::fake();
+        Excel::fake();
 
         $this->loginAs()
             ->get(route('bills.export'))
             ->assertStatus(200);
 
-        \Excel::matchByRegex();
+        Excel::matchByRegex();
 
-        \Excel::assertDownloaded(
-            '/' . \Str::filename(trans_choice('general.bills', 2)) . '-\d{10}\.xlsx/',
+        Excel::assertDownloaded(
+            '/' . str()->filename(trans_choice('general.bills', 2)) . '-\d{10}\.xlsx/',
             function (Export $export) use ($count) {
                 // Assert that the correct export is downloaded.
                 return $export->sheets()[0]->collection()->count() === $count;
@@ -191,7 +226,7 @@ class BillsTest extends FeatureTestCase
 
         $bills = Document::factory()->bill()->count($create_count)->create();
 
-        \Excel::fake();
+        Excel::fake();
 
         $this->loginAs()
             ->post(
@@ -200,10 +235,10 @@ class BillsTest extends FeatureTestCase
             )
             ->assertStatus(200);
 
-        \Excel::matchByRegex();
+        Excel::matchByRegex();
 
-        \Excel::assertDownloaded(
-            '/' . \Str::filename(trans_choice('general.bills', 2)) . '-\d{10}\.xlsx/',
+        Excel::assertDownloaded(
+            '/' . str()->filename(trans_choice('general.bills', 2)) . '-\d{10}\.xlsx/',
             function (Export $export) use ($select_count) {
                 return $export->sheets()[0]->collection()->count() === $select_count;
             }
@@ -212,7 +247,7 @@ class BillsTest extends FeatureTestCase
 
     public function testItShouldImportBills()
     {
-        \Excel::fake();
+        Excel::fake();
 
         $this->loginAs()
             ->post(
@@ -226,9 +261,70 @@ class BillsTest extends FeatureTestCase
             )
             ->assertStatus(200);
 
-        \Excel::assertImported('bills.xlsx');
+        Excel::assertImported('bills.xlsx');
 
         $this->assertFlashLevel('success');
+    }
+
+    public function testItShouldUpdateTransactionContactWhenBillVendorChanges()
+    {
+        $vendorA = Contact::factory()->vendor()->enabled()->create();
+        $vendorB = Contact::factory()->vendor()->enabled()->create();
+
+        $request = $this->getRequest();
+        $request['status']        = 'draft';
+        $request['contact_id']    = $vendorA->id;
+        $request['contact_name']  = $vendorA->name;
+        $request['contact_email'] = $vendorA->email;
+
+        $bill = $this->dispatch(new CreateDocument($request));
+
+        // Non-reconciled transaction — must follow the new contact
+        $transaction = Transaction::factory()->expense()->create([
+            'document_id' => $bill->id,
+            'contact_id'  => $vendorA->id,
+            'reconciled'  => 0,
+        ]);
+
+        $request['contact_id']    = $vendorB->id;
+        $request['contact_name']  = $vendorB->name;
+        $request['contact_email'] = $vendorB->email;
+
+        $this->dispatch(new UpdateDocument($bill, $request));
+
+        $transaction->refresh();
+
+        $this->assertEquals($vendorB->id, $transaction->contact_id);
+    }
+
+    public function testItShouldThrowWhenChangingContactOnBillWithReconciledTransaction()
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessageMatches('/reconciled/i');
+
+        $vendorA = Contact::factory()->vendor()->enabled()->create();
+        $vendorB = Contact::factory()->vendor()->enabled()->create();
+
+        $request = $this->getRequest();
+        $request['status']        = 'draft';
+        $request['contact_id']    = $vendorA->id;
+        $request['contact_name']  = $vendorA->name;
+        $request['contact_email'] = $vendorA->email;
+
+        $bill = $this->dispatch(new CreateDocument($request));
+
+        // Any reconciled transaction on the bill must block the contact change
+        Transaction::factory()->expense()->create([
+            'document_id' => $bill->id,
+            'contact_id'  => $vendorA->id,
+            'reconciled'  => 1,
+        ]);
+
+        $request['contact_id']    = $vendorB->id;
+        $request['contact_name']  = $vendorB->name;
+        $request['contact_email'] = $vendorB->email;
+
+        $this->dispatch(new UpdateDocument($bill, $request));
     }
 
     public function getRequest($recurring = false)

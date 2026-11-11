@@ -2,58 +2,53 @@
 
 namespace App\Abstracts;
 
+use Akaunting\Sortable\Traits\Sortable;
 use App\Events\Common\SearchStringApplied;
 use App\Events\Common\SearchStringApplying;
+use App\Interfaces\Export\WithParentSheet;
 use App\Traits\DateTime;
 use App\Traits\Owners;
+use App\Traits\SearchString;
 use App\Traits\Sources;
 use App\Traits\Tenants;
+use App\Utilities\SearchStringColumns;
 use GeneaLabs\LaravelModelCaching\Traits\Cachable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model as Eloquent;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Kyslik\ColumnSortable\Sortable;
 use Laratrust\Contracts\Ownable;
-use Lorisleiva\LaravelSearchString\Concerns\SearchString;
+use Lorisleiva\LaravelSearchString\Concerns\SearchString as LaravelSearchString;
+use Lorisleiva\LaravelSearchString\Visitors\BuildColumnsVisitor;
 
 abstract class Model extends Eloquent implements Ownable
 {
-    use Cachable, DateTime, Owners, SearchString, SoftDeletes, Sortable, Sources, Tenants;
+    use Cachable, DateTime, LaravelSearchString, Owners, SearchString, SoftDeletes, Sortable, Sources, Tenants {
+        LaravelSearchString::getSearchStringVisitors as getPackageSearchStringVisitors;
+    }
 
     protected $tenantable = true;
 
-    protected $dates = ['deleted_at'];
-
     protected $casts = [
-        'enabled' => 'boolean',
+        'amount'        => 'double',
+        'enabled'       => 'boolean',
+        'deleted_at'    => 'datetime',
     ];
 
     public $allAttributes = [];
 
     /**
-     * Create a new Eloquent model instance.
+     * Fill the model with an array of attributes.
      *
      * @param  array  $attributes
-     * @return void
+     * @return $this
+     *
+     * @throws \Illuminate\Database\Eloquent\MassAssignmentException
      */
-    public function __construct(array $attributes = [])
+    public function fill(array $attributes)
     {
         $this->allAttributes = $attributes;
 
-        parent::__construct($attributes);
-    }
-
-    /**
-     * Update the model in the database.
-     *
-     * @param  array  $attributes
-     * @param  array  $options
-     * @return bool
-     */
-    public function update(array $attributes = [], array $options = [])
-    {
-        $this->allAttributes = $attributes;
-
-        return parent::update($attributes, $options);
+        return parent::fill($attributes);
     }
 
     /**
@@ -73,7 +68,7 @@ abstract class Model extends Eloquent implements Ownable
      */
     public function owner()
     {
-        return $this->belongsTo('App\Models\Auth\User', 'created_by', 'id')->withDefault(['name' => trans('general.na')]);
+        return $this->belongsTo(user_model_class(), 'created_by', 'id')->withDefault(['name' => trans('general.na')]);
     }
 
     /**
@@ -113,24 +108,49 @@ abstract class Model extends Eloquent implements Ownable
     {
         $request = request();
 
+        /**
+         * Modules that use the sort parameter in CRUD operations cause an error,
+         * so this sort parameter set back to old value after the query is executed.
+         *
+         * for Custom Fields module
+         */
+        $request_sort = $request->get('sort');
+
         $query->usingSearchString()->sortable($sort);
 
         if ($request->expectsJson() && $request->isNotApi()) {
             return $query->get();
         }
 
-        $limit = (int) $request->get('limit', setting('default.list_limit', '25'));
-
-        return $query->paginate($limit);
+        $request->merge(['sort' => $request_sort]);
+        // This line disabled because broken sortable issue.
+        //$request->offsetUnset('direction');
+        return $query->paginate(list_limit());
     }
 
-    public function scopeUsingSearchString($query)
+    public function scopeUsingSearchString(Builder $query, string|null $string = null)
     {
         event(new SearchStringApplying($query));
 
-        $this->getSearchStringManager()->updateBuilder($query, request('search'));
+        $string = $string ?: request('search', '');
+
+        $string = $this->stripUnknownSearchStringTokens($string, get_class($this));
+
+        $this->getSearchStringManager()->updateBuilder($query, $string);
 
         event(new SearchStringApplied($query));
+    }
+
+    /**
+     * The package's search string visitors, with a column builder that keeps the rows whose column is empty under a
+     * negated term (SearchStringColumns), so "is X" and "is not X" make up the whole.
+     */
+    public function getSearchStringVisitors($manager, $builder)
+    {
+        return array_map(
+            fn ($visitor) => ($visitor instanceof BuildColumnsVisitor) ? new SearchStringColumns($manager, $builder) : $visitor,
+            $this->getPackageSearchStringVisitors($manager, $builder),
+        );
     }
 
     /**
@@ -148,7 +168,7 @@ abstract class Model extends Eloquent implements Ownable
         $request = request();
 
         if (!empty($ids)) {
-            $query->whereIn($id_field, (array) $ids);
+            $query->whereIn($this->qualifyColumn($id_field), (array) $ids);
         }
 
         $search = $request->get('search');
@@ -159,7 +179,9 @@ abstract class Model extends Eloquent implements Ownable
         $limit = (int) $request->get('limit', setting('default.list_limit', '25'));
         $offset = $page ? ($page - 1) * $limit : 0;
 
-        $query->offset($offset)->limit($limit);
+        if (! $this instanceof WithParentSheet && (empty($ids) || count((array) $ids) > $limit)) {
+            $query->offset($offset)->limit($limit);
+        }
 
         return $query->cursor();
     }
@@ -229,6 +251,25 @@ abstract class Model extends Eloquent implements Ownable
     public function scopeIsNotOwner($query)
     {
         return $query->where($this->qualifyColumn('created_by'), '<>', user_id());
+    }
+
+    public function scopeIsRecurring(Builder $query): Builder
+    {
+        return $query->where($this->qualifyColumn('type'), 'like', '%-recurring');
+    }
+
+    public function scopeIsNotRecurring(Builder $query): Builder
+    {
+        return $query->where($this->qualifyColumn('type'), 'not like', '%-recurring');
+    }
+
+    public function scopeModuleEnabled(Builder $query, string $module): Builder
+    {
+        return $query->allCompanies()->whereHas('company', fn (Builder $q1) =>
+            $q1->enabled()->whereHas('modules', fn (Builder $q2) =>
+                $q2->allCompanies()->alias($module)->enabled(),
+            )
+        );
     }
 
     public function ownerKey($owner)

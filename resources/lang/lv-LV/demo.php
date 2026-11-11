@@ -13,9 +13,6 @@ return [
 
     'currencies' => [
         'usd'               => 'ASV dolārs',
-        'eur'               => 'Euro',
-        'gbp'               => 'Angļu mārciņa',
-        'try'               => 'Turku lira',
     ],
 
     'offline_payments' => [

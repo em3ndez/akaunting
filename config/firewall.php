@@ -4,12 +4,21 @@ return [
 
     'enabled' => env('FIREWALL_ENABLED', false),
 
-    'whitelist' => [env('FIREWALL_WHITELIST', '')],
+    'whitelist' => explode(',', env('FIREWALL_WHITELIST', '')),
 
     'models' => [
         'user' => '\App\Models\Auth\User',
         // 'log' => '\App\Models\YourLogModel',
         // 'ip'  => '\App\Models\YourIpModel',
+    ],
+
+    'log' => [
+        'max_request_size' => 2048,
+    ],
+
+    'cron' => [
+        'enabled' => env('FIREWALL_CRON_ENABLED', true),
+        'expression' => env('FIREWALL_CRON_EXPRESSION', '* * * * *'),
     ],
 
     'responses' => [
@@ -30,6 +39,7 @@ return [
             'name' => env('FIREWALL_EMAIL_NAME', 'Akaunting Firewall'),
             'from' => env('FIREWALL_EMAIL_FROM', 'firewall@mydomain.com'),
             'to' => env('FIREWALL_EMAIL_TO', 'admin@mydomain.com'),
+            'queue' => env('FIREWALL_EMAIL_QUEUE', 'default'),
         ],
 
         'slack' => [
@@ -38,6 +48,7 @@ return [
             'from' => env('FIREWALL_SLACK_FROM', 'Akaunting Firewall'),
             'to' => env('FIREWALL_SLACK_TO'), // webhook url
             'channel' => env('FIREWALL_SLACK_CHANNEL', null), // set null to use the default channel of webhook
+            'queue' => env('FIREWALL_SLACK_QUEUE', 'default'),
         ],
 
     ],
@@ -54,13 +65,16 @@ return [
         'firewall.session',
         //'firewall.sqli',
         'firewall.swear',
-        'firewall.xss',
+        //'firewall.xss',
+        \App\Http\Middleware\Firewall\Xss::class,
         //'App\Http\Middleware\YourCustomRule',
     ],
 
     'middleware' => [
 
         'ip' => [
+            'enabled' => env('FIREWALL_MIDDLEWARE_IP_ENABLED', env('FIREWALL_ENABLED', true)),
+
             'methods' => ['all'],
 
             'routes' => [
@@ -70,6 +84,8 @@ return [
         ],
 
         'agent' => [
+            'enabled' => env('FIREWALL_MIDDLEWARE_AGENT_ENABLED', env('FIREWALL_ENABLED', true)),
+
             'methods' => ['all'],
 
             'routes' => [
@@ -99,13 +115,15 @@ return [
             ],
 
             'auto_block' => [
-                'attempts' => 5,
+                'attempts' => env('FIREWALL_MIDDLEWARE_AGENT_AUTO_BLOCK_ATTEMPTS', 5),
                 'frequency' => 1 * 60, // 1 minute
                 'period' => 30 * 60, // 30 minutes
             ],
         ],
 
         'bot' => [
+            'enabled' => env('FIREWALL_MIDDLEWARE_BOT_ENABLED', env('FIREWALL_ENABLED', true)),
+
             'methods' => ['all'],
 
             'routes' => [
@@ -120,13 +138,15 @@ return [
             ],
 
             'auto_block' => [
-                'attempts' => 5,
+                'attempts' => env('FIREWALL_MIDDLEWARE_BOT_AUTO_BLOCK_ATTEMPTS', 5),
                 'frequency' => 1 * 60, // 1 minute
                 'period' => 30 * 60, // 30 minutes
             ],
         ],
 
         'geo' => [
+            'enabled' => env('FIREWALL_MIDDLEWARE_GEO_ENABLED', env('FIREWALL_ENABLED', true)),
+
             'methods' => ['all'],
 
             'routes' => [
@@ -158,13 +178,15 @@ return [
             'service' => 'ipapi',
 
             'auto_block' => [
-                'attempts' => 3,
+                'attempts' => env('FIREWALL_MIDDLEWARE_GEO_AUTO_BLOCK_ATTEMPTS', 3),
                 'frequency' => 5 * 60, // 5 minutes
                 'period' => 30 * 60, // 30 minutes
             ],
         ],
 
         'lfi' => [
+            'enabled' => env('FIREWALL_MIDDLEWARE_LFI_ENABLED', env('FIREWALL_ENABLED', true)),
+
             'methods' => ['get', 'delete'],
 
             'routes' => [
@@ -182,23 +204,25 @@ return [
             ],
 
             'auto_block' => [
-                'attempts' => 3,
+                'attempts' => env('FIREWALL_MIDDLEWARE_LFI_AUTO_BLOCK_ATTEMPTS', 3),
                 'frequency' => 5 * 60, // 5 minutes
                 'period' => 30 * 60, // 30 minutes
             ],
         ],
 
         'login' => [
-            'enabled' => true,
+            'enabled' => env('FIREWALL_MIDDLEWARE_LOGIN_ENABLED', env('FIREWALL_ENABLED', true)),
 
             'auto_block' => [
-                'attempts' => 5,
+                'attempts' => env('FIREWALL_MIDDLEWARE_LOGIN_AUTO_BLOCK_ATTEMPTS', 10),
                 'frequency' => 1 * 60, // 1 minute
                 'period' => 30 * 60, // 30 minutes
             ],
         ],
 
         'php' => [
+            'enabled' => env('FIREWALL_MIDDLEWARE_PHP_ENABLED', env('FIREWALL_ENABLED', true)),
+
             'methods' => ['get', 'post', 'delete'],
 
             'routes' => [
@@ -225,13 +249,15 @@ return [
             ],
 
             'auto_block' => [
-                'attempts' => 3,
+                'attempts' => env('FIREWALL_MIDDLEWARE_PHP_AUTO_BLOCK_ATTEMPTS', 3),
                 'frequency' => 5 * 60, // 5 minutes
                 'period' => 30 * 60, // 30 minutes
             ],
         ],
 
         'referrer' => [
+            'enabled' => env('FIREWALL_MIDDLEWARE_REFERRER_ENABLED', env('FIREWALL_ENABLED', true)),
+
             'methods' => ['all'],
 
             'routes' => [
@@ -242,13 +268,15 @@ return [
             'blocked' => [],
 
             'auto_block' => [
-                'attempts' => 3,
+                'attempts' => env('FIREWALL_MIDDLEWARE_REFERRER_AUTO_BLOCK_ATTEMPTS', 3),
                 'frequency' => 5 * 60, // 5 minutes
                 'period' => 30 * 60, // 30 minutes
             ],
         ],
 
         'rfi' => [
+            'enabled' => env('FIREWALL_MIDDLEWARE_RFI_ENABLED', env('FIREWALL_ENABLED', true)),
+
             'methods' => ['get', 'post', 'delete'],
 
             'routes' => [
@@ -258,7 +286,9 @@ return [
 
             'inputs' => [
                 'only' => [], // i.e. 'first_name'
-                'except' => [], // i.e. 'password'
+                'except' => [
+                    'body', // for custom email add link
+                ], // i.e. 'password'
             ],
 
             'patterns' => [
@@ -268,13 +298,15 @@ return [
             'exceptions' => [],
 
             'auto_block' => [
-                'attempts' => 3,
+                'attempts' => env('FIREWALL_MIDDLEWARE_RFI_AUTO_BLOCK_ATTEMPTS', 3),
                 'frequency' => 5 * 60, // 5 minutes
                 'period' => 30 * 60, // 30 minutes
             ],
         ],
 
         'session' => [
+            'enabled' => env('FIREWALL_MIDDLEWARE_SESSION_ENABLED', env('FIREWALL_ENABLED', true)),
+
             'methods' => ['get', 'post', 'delete'],
 
             'routes' => [
@@ -293,13 +325,15 @@ return [
             ],
 
             'auto_block' => [
-                'attempts' => 3,
+                'attempts' => env('FIREWALL_MIDDLEWARE_SESSION_AUTO_BLOCK_ATTEMPTS', 3),
                 'frequency' => 5 * 60, // 5 minutes
                 'period' => 30 * 60, // 30 minutes
             ],
         ],
 
         'sqli' => [
+            'enabled' => env('FIREWALL_MIDDLEWARE_SQLI_ENABLED', env('FIREWALL_ENABLED', true)),
+
             'methods' => ['get', 'delete'],
 
             'routes' => [
@@ -318,13 +352,15 @@ return [
             ],
 
             'auto_block' => [
-                'attempts' => 3,
+                'attempts' => env('FIREWALL_MIDDLEWARE_SQLI_AUTO_BLOCK_ATTEMPTS', 3),
                 'frequency' => 5 * 60, // 5 minutes
                 'period' => 30 * 60, // 30 minutes
             ],
         ],
 
         'swear' => [
+            'enabled' => env('FIREWALL_MIDDLEWARE_SWEAR_ENABLED', env('FIREWALL_ENABLED', true)),
+
             'methods' => ['post', 'put', 'patch'],
 
             'routes' => [
@@ -340,25 +376,29 @@ return [
             'words' => [],
 
             'auto_block' => [
-                'attempts' => 3,
+                'attempts' => env('FIREWALL_MIDDLEWARE_SWEAR_AUTO_BLOCK_ATTEMPTS', 3),
                 'frequency' => 5 * 60, // 5 minutes
                 'period' => 30 * 60, // 30 minutes
             ],
         ],
 
         'url' => [
+            'enabled' => env('FIREWALL_MIDDLEWARE_URL_ENABLED', env('FIREWALL_ENABLED', true)),
+
             'methods' => ['all'],
 
             'inspections' => [], // i.e. 'admin'
 
             'auto_block' => [
-                'attempts' => 5,
+                'attempts' => env('FIREWALL_MIDDLEWARE_URL_AUTO_BLOCK_ATTEMPTS', 5),
                 'frequency' => 1 * 60, // 1 minute
                 'period' => 30 * 60, // 30 minutes
             ],
         ],
 
         'whitelist' => [
+            'enabled' => env('FIREWALL_MIDDLEWARE_WHITELIST_ENABLED', env('FIREWALL_ENABLED', true)),
+
             'methods' => ['all'],
 
             'routes' => [
@@ -368,6 +408,8 @@ return [
         ],
 
         'xss' => [
+            'enabled' => env('FIREWALL_MIDDLEWARE_XSS_ENABLED', env('FIREWALL_ENABLED', true)),
+
             'methods' => ['post', 'put', 'patch'],
 
             'routes' => [
@@ -384,8 +426,8 @@ return [
                 // Evil starting attributes
                 '#(<[^>]+[\x00-\x20\"\'\/])(form|formaction|on\w*|style|xmlns|xlink:href)[^>]*>?#iUu',
 
-                // javascript:, livescript:, vbscript:, mocha: protocols
-                '!((java|live|vb)script|mocha|feed|data):(\w)*!iUu',
+                // javascript:, livescript:, vbscript:, mocha: protocols (literal)
+                '!((java|live|vb)script|mocha):|(feed|data):[^,;\s]*[,;]!iUu',
                 '#-moz-binding[\x00-\x20]*:#u',
 
                 // Unneeded tags
@@ -393,8 +435,26 @@ return [
             ],
 
             'auto_block' => [
-                'attempts' => 3,
+                'attempts' => env('FIREWALL_MIDDLEWARE_XSS_AUTO_BLOCK_ATTEMPTS', 3),
                 'frequency' => 5 * 60, // 5 minutes
+                'period' => 30 * 60, // 30 minutes
+            ],
+        ],
+
+        // Custom middleware
+        'too_many_emails_sent' => [
+            'enabled' => env('FIREWALL_MIDDLEWARE_TOO_MANY_EMAILS_SENT_ENABLED', env('FIREWALL_ENABLED', true)),
+
+            'methods' => ['post'],
+
+            'routes' => [
+                'only' => [], // i.e. 'contact'
+                'except' => [], // i.e. 'admin/*'
+            ],
+
+            'auto_block' => [
+                'attempts' => env('FIREWALL_MIDDLEWARE_TOO_MANY_EMAILS_SENT_AUTO_BLOCK_ATTEMPTS', 20),
+                'frequency' => 1 * 60, // 1 minute
                 'period' => 30 * 60, // 30 minutes
             ],
         ],

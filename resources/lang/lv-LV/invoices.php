@@ -9,6 +9,7 @@ return [
     'due_date'              => 'Apmaksas termiņš',
     'order_number'          => 'Pasūtījuma numurs',
     'bill_to'               => 'Saņēmējs',
+    'cancel_date'           => 'Atcelt datumu',
 
     'quantity'              => 'Daudzums',
     'price'                 => 'Cena',
@@ -19,6 +20,7 @@ return [
     'total'                 => 'Summa kopā',
 
     'item_name'             => 'Nosaukums|Nosaukums',
+    'recurring_invoices'    => 'Atkārtots rēķins|Atkārtoti rēķini',
 
     'show_discount'         => ':discount% atlaide',
     'add_discount'          => 'Pievieno atlaidi',
@@ -40,6 +42,11 @@ return [
     'send_invoice'          => 'Sūtīt rēķinu',
     'get_paid'              => 'Saņemt apmaksu',
     'accept_payments'       => 'Pieņemt tiešsaistes maksājumus',
+    'payments_received'     => 'Saņemtie maksājumi',
+
+    'form_description' => [
+        'billing'           => 'Norēķinu informācija tiek parādīta jūsu rēķinā. Informācijas panelī un pārskatos tiek izmantots rēķina datums. Kā Apmaksas datumu atlasiet datumu, kurā plānojat veikt maksājumu.',
+    ],
 
     'messages' => [
         'email_required'    => 'Pircējam nav norādīta e-pasta adrese!',
@@ -56,6 +63,23 @@ return [
                 'await'     => 'Gaida maksājumu',
             ],
         ],
+    ],
+
+    'slider' => [
+        'create'            => ':user izveidoja šo pārskaitījumu :date',
+        'create_recurring'  => ':user izveidoja šo periodisko veidni :date',
+        'schedule'          => 'Atkārtojiet katru :interval :frequency kopš :date',
+        'children'          => ':count rēķini tika izveidoti automātiski',
+    ],
+
+    'share' => [
+        'show_link'         => 'Jūsu klients var apskatīt rēķinu šajā saitē',
+        'copy_link'         => 'Kopējiet saiti un kopīgojiet to ar savu klientu.',
+        'success_message'   => 'Kopīgošanas saite ir iekopēta starpliktuvē!',
+    ],
+
+    'sticky' => [
+        'description'       => 'Jūsu priekšskatījums, kā jūsu klients redzēs jūsu rēķina tīmekļa versiju.',
     ],
 
 ];

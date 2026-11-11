@@ -3,31 +3,31 @@
 namespace App\Notifications\Purchase;
 
 use App\Abstracts\Notification;
-use App\Models\Common\EmailTemplate;
+use App\Models\Setting\EmailTemplate;
+use App\Models\Document\Document;
+use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Str;
 
 class Bill extends Notification
 {
     /**
      * The bill model.
      *
-     * @var object
+     * @var Document
      */
     public $bill;
 
     /**
      * The email template.
      *
-     * @var \App\Models\Common\EmailTemplate
+     * @var EmailTemplate
      */
     public $template;
 
     /**
      * Create a notification instance.
-     *
-     * @param  object  $bill
-     * @param  object  $template_alias
      */
-    public function __construct($bill = null, $template_alias = null)
+    public function __construct(Document $bill = null, string $template_alias = null)
     {
         parent::__construct();
 
@@ -39,11 +39,10 @@ class Bill extends Notification
      * Build the mail representation of the notification.
      *
      * @param  mixed  $notifiable
-     * @return \Illuminate\Notifications\Messages\MailMessage
      */
-    public function toMail($notifiable)
+    public function toMail($notifiable): MailMessage
     {
-        $message = $this->initMessage();
+        $message = $this->initMailMessage();
 
         return $message;
     }
@@ -52,12 +51,15 @@ class Bill extends Notification
      * Get the array representation of the notification.
      *
      * @param  mixed  $notifiable
-     * @return array
      */
-    public function toArray($notifiable)
+    public function toArray($notifiable): array
     {
+        $this->initArrayMessage();
+
         return [
             'template_alias' => $this->template->alias,
+            'title' => trans('notifications.menu.' . $this->template->alias . '.title'),
+            'description' => trans('notifications.menu.' . $this->template->alias . '.description', $this->getTagsBinding()),
             'bill_id' => $this->bill->id,
             'bill_number' => $this->bill->document_number,
             'vendor_name' => $this->bill->contact_name,
@@ -68,7 +70,7 @@ class Bill extends Notification
         ];
     }
 
-    public function getTags()
+    public function getTags(): array
     {
         return [
             '{bill_number}',
@@ -86,15 +88,20 @@ class Bill extends Notification
         ];
     }
 
-    public function getTagsReplacement()
+    public function getTagsReplacement(): array
     {
+        $route_params = [
+            'company_id'    => $this->bill->company_id,
+            'bill'          => $this->bill->id,
+        ];
+
         return [
             $this->bill->document_number,
-            money($this->bill->amount, $this->bill->currency_code, true),
-            money($this->bill->amount_due, $this->bill->currency_code, true),
+            money($this->bill->amount, $this->bill->currency_code),
+            money($this->bill->amount_due, $this->bill->currency_code),
             company_date($this->bill->issued_at),
             company_date($this->bill->due_at),
-            route('bills.show', $this->bill->id),
+            route('bills.show', $route_params),
             $this->bill->contact_name,
             $this->bill->company->name,
             $this->bill->company->email,

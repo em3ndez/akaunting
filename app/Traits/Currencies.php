@@ -44,11 +44,11 @@ trait Currencies
     {
         $default_amount = $amount;
 
-        if ($from_code != setting('default.currency')) {
+        if ($from_code != default_currency()) {
             $default_amount = $this->convertToDefault($amount, $from_code, $from_rate);
         }
 
-        $converted_amount = $this->convertFromDefault($default_amount, $to_code, $to_rate, false, $from_code);
+        $converted_amount = $this->convertFromDefault($default_amount, $to_code, $to_rate);
 
         return $converted_amount;
     }
@@ -70,7 +70,7 @@ trait Currencies
 
     public function getDefaultCurrency()
     {
-        return !empty($this->default_currency_code) ? $this->default_currency_code : setting('default.currency');
+        return !empty($this->default_currency_code) ? $this->default_currency_code : default_currency();
     }
 
     public function setDefaultCurrency($code)

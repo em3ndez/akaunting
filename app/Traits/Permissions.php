@@ -3,8 +3,8 @@
 namespace App\Traits;
 
 use App\Models\Auth\Permission;
-use App\Models\Auth\Role;
 use App\Traits\SearchString;
+use App\Traits\Translations;
 use App\Utilities\Reports;
 use App\Utilities\Widgets;
 use Illuminate\Routing\Route;
@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 
 trait Permissions
 {
-    use SearchString;
+    use SearchString, Translations;
 
     public function getActionsMap()
     {
@@ -248,13 +248,37 @@ trait Permissions
 
     public function createRole($name, $display_name = null, $description = null)
     {
-        $display_name = $display_name ?? Str::title($name);
+        $alias = !empty($this->alias) ? $this->alias : $name;
 
-        return Role::firstOrCreate([
+        if (empty($display_name)) {
+            $display_name = $this->findTranslation([
+                'auth.roles.' . Str::replace('-', '_', $name) . '.name',
+                $alias . '::permissions.roles.' . Str::replace('-', '_', $name) . '.name',
+                $alias . '::auth.roles.' . Str::replace('-', '_', $name) . '.name',
+            ]);
+
+            if (empty($display_name)) {
+                $display_name = Str::title(Str::replace('-', ' ', $name));
+            }
+        }
+
+        if (empty($description)) {
+            $description = $this->findTranslation([
+                'auth.roles.' . Str::replace('-', '_', $name) . '.description',
+                $alias . '::permissions.roles.' . Str::replace('-', '_', $name) . '.description',
+                $alias . '::auth.roles.' . Str::replace('-', '_', $name) . '.description',
+            ]);
+
+            if (empty($description)) {
+                $description = $display_name;
+            }
+        }
+
+        return role_model_class()::firstOrCreate([
             'name' => $name,
         ], [
             'display_name' => $display_name,
-            'description' => $description ?? $display_name,
+            'description' => $description,
         ]);
     }
 
@@ -286,7 +310,7 @@ trait Permissions
     public function detachPermission($role, $permission, $delete = true)
     {
         if (is_string($role)) {
-            $role = Role::where('name', $role)->first();
+            $role = role_model_class()::where('name', $role)->first();
         }
 
         if (empty($role)) {
@@ -366,14 +390,14 @@ trait Permissions
 
     public function getRoles($require = 'read-admin-panel')
     {
-        return Role::all()->filter(function ($role) use ($require) {
+        return role_model_class()::all()->filter(function ($role) use ($require) {
             return $require ? $role->hasPermission($require) : true;
         });
     }
 
     public function getDefaultAdminRoles($custom = null)
     {
-        $roles = Role::whereIn('name', $custom ?? ['admin', 'manager'])->get();
+        $roles = role_model_class()::whereIn('name', $custom ?? ['admin', 'manager'])->get();
 
         if ($roles->isNotEmpty()) {
             return $roles;
@@ -384,7 +408,7 @@ trait Permissions
 
     public function getDefaultPortalRoles($custom = null)
     {
-        $roles = Role::whereIn('name', $custom ?? ['customer'])->get();
+        $roles = role_model_class()::whereIn('name', $custom ?? ['customer'])->get();
 
         if ($roles->isNotEmpty()) {
             return $roles;
@@ -405,27 +429,27 @@ trait Permissions
             return;
         }
 
-        $table = request()->isApi() ? request()->segment(2) : '';
+        $table = request_is_api() ? request()->segment(2) : '';
 
         // Find the proper controller for common API endpoints
-        if (in_array($table, ['contacts', 'documents', 'transactions'])) {
+        if (in_array($table, ['contacts', 'documents'])) {
             $controller = '';
 
             // Look for type in search variable like api/contacts?search=type:customer
             $type = $this->getSearchStringValue('type');
 
-            if (!empty($type)) {
-                $alias = config('type.' . $type . '.alias');
-                $group = config('type.' . $type . '.group');
-                $prefix = config('type.' . $type . '.permission.prefix');
+            if (! empty($type)) {
+                $alias = config('type.' . Str::singular($table) . '.' . $type . '.alias');
+                $group = config('type.' . Str::singular($table) . '.' . $type . '.group');
+                $prefix = config('type.' . Str::singular($table) . '.' . $type . '.permission.prefix');
 
                 // if use module set module alias
-                if (!empty($alias)) {
+                if (! empty($alias)) {
                     $controller .= $alias . '-';
                 }
 
                 // if controller in folder it must
-                if (!empty($group)) {
+                if (! empty($group)) {
                     $controller .= $group . '-';
                 }
 
@@ -434,45 +458,62 @@ trait Permissions
         } else {
             $route = app(Route::class);
 
-            // Get the controller array
-            $arr = array_reverse(explode('\\', explode('@', $route->getAction()['uses'])[0]));
-
-            $controller = '';
-
-            // Add module
-            if (isset($arr[3]) && isset($arr[4])) {
-                if (strtolower($arr[4]) == 'modules') {
-                    $controller .= Str::kebab($arr[3]) . '-';
-                } elseif (isset($arr[5]) && (strtolower($arr[5]) == 'modules')) {
-                    $controller .= Str::kebab($arr[4]) . '-';
-                }
-            }
-
-            // Add folder
-            if (!in_array(strtolower($arr[1]), ['api', 'controllers'])) {
-                $controller .= Str::kebab($arr[1]) . '-';
-            }
-
-            // Add file
-            $controller .= Str::kebab($arr[0]);
+            $controller = $this->getControllerPermissionName($route->getAction()['uses']);
 
             // Skip ACL
             $skip = ['portal-dashboard'];
             if (in_array($controller, $skip)) {
                 return;
             }
-
-            // App\Http\Controllers\FooBar                  -->> foo-bar
-            // App\Http\Controllers\FooBar\Main             -->> foo-bar-main
-            // Modules\Blog\Http\Controllers\Posts          -->> blog-posts
-            // Modules\Blog\Http\Controllers\Portal\Posts   -->> blog-portal-posts
         }
 
+        $crud = [
+            'create' => ['create', 'store', 'duplicate', 'import'],
+            'read' => ['index', 'show', 'edit', 'export'],
+            'update' => ['update', 'enable', 'disable', 'markSent', 'markCancelled', 'markReceived', 'markApproved', 'markRefused', 'restoreInvoice', 'restoreBill', 'end'],
+            'delete' => ['destroy'],
+        ];
+
         // Add CRUD permission check
-        $this->middleware('permission:create-' . $controller)->only('create', 'store', 'duplicate', 'import');
-        $this->middleware('permission:read-' . $controller)->only('index', 'show', 'edit', 'export');
-        $this->middleware('permission:update-' . $controller)->only('update', 'enable', 'disable');
-        $this->middleware('permission:delete-' . $controller)->only('destroy');
+        $this->middleware('permission:create-' . $controller)->only($crud['create']);
+        $this->middleware('permission:read-' . $controller)->only($crud['read']);
+        $this->middleware('permission:update-' . $controller)->only($crud['update']);
+        $this->middleware('permission:delete-' . $controller)->only($crud['delete']);
+    }
+
+    /**
+     * The controller part of the CRUD permission names a controller action is gated by.
+     *
+     * App\Http\Controllers\FooBar                  -->> foo-bar
+     * App\Http\Controllers\FooBar\Main             -->> foo-bar-main
+     * Modules\Blog\Http\Controllers\Posts          -->> blog-posts
+     * Modules\Blog\Http\Controllers\Portal\Posts   -->> blog-portal-posts
+     */
+    public function getControllerPermissionName(string $uses): string
+    {
+        // Get the controller array
+        $arr = array_reverse(explode('\\', explode('@', $uses)[0]));
+
+        $controller = '';
+
+        // Add module
+        if (isset($arr[3]) && isset($arr[4])) {
+            if (strtolower($arr[4]) == 'modules') {
+                $controller .= Str::kebab($arr[3]) . '-';
+            } elseif (isset($arr[5]) && (strtolower($arr[5]) == 'modules')) {
+                $controller .= Str::kebab($arr[4]) . '-';
+            }
+        }
+
+        // Add folder
+        if (! in_array(strtolower($arr[1]), ['api', 'controllers'])) {
+            $controller .= Str::kebab($arr[1]) . '-';
+        }
+
+        // Add file
+        $controller .= Str::kebab($arr[0]);
+
+        return $controller;
     }
 
     public function canAccessMenuItem($title, $permissions)

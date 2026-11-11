@@ -8,20 +8,30 @@ use App\Interfaces\Job\HasSource;
 use App\Interfaces\Job\ShouldCreate;
 use App\Models\Banking\Reconciliation;
 use App\Models\Banking\Transaction;
+use App\Utilities\Date;
 
 class CreateReconciliation extends Job implements HasOwner, HasSource, ShouldCreate
 {
     public function handle(): Reconciliation
     {
         \DB::transaction(function () {
+            $started_at = Date::parse($this->request->get('started_at'))->startOfDay();
+            $ended_at = Date::parse($this->request->get('ended_at'))->endOfDay();
+
             $reconcile = (int) $this->request->get('reconcile');
             $transactions = $this->request->get('transactions');
 
-            $this->request->merge(['reconciled' => $reconcile]);
+            $this->request->merge([
+                'started_at' => $started_at,
+                'ended_at' => $ended_at,
+                'reconciled' => $reconcile,
+            ]);
 
             $this->model = Reconciliation::create($this->request->all());
 
             if ($reconcile && $transactions) {
+                $transaction_ids = [];
+
                 foreach ($transactions as $key => $value) {
                     if (empty($value)) {
                         continue;
@@ -29,7 +39,11 @@ class CreateReconciliation extends Job implements HasOwner, HasSource, ShouldCre
 
                     $t = explode('_', $key);
 
-                    $transaction = Transaction::find($t[1]);
+                    $transaction_ids[] = $t[1];
+                }
+
+                // One query for the transactions, save() keeps the observers running
+                foreach (Transaction::find($transaction_ids) as $transaction) {
                     $transaction->reconciled = 1;
                     $transaction->save();
                 }

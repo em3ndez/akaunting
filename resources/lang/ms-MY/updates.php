@@ -4,12 +4,12 @@ return [
 
     'installed_version'     => 'Versi Terpasang',
     'latest_version'        => 'Versi Terkini',
-    'update'                => 'Kemas kini Akaunting kepada versi :version',
+    'update'                => 'Kemas kini Akaunting ke versi :version',
     'changelog'             => 'Log Perubahan',
-    'check'                 => 'Periksa',
-    'new_core'              => 'Akaunting versi yang dikemas kini ada tersedia.',
-    'latest_core'           => 'Tahniah! Anda mempunyai Akaunting versi yang terkini. Kemas kini keselamatan yang akan datang akan dipasang secara automatik.',
-    'success'               => 'Proses kemas kini telah selesai dengan jayanya.',
-    'error'                 => 'Proses kemas kini telah gagal, cuba semula.',
+    'check'                 => 'Semak',
+    'new_core'              => 'Versi terkini Akaunting tersedia.',
+    'latest_core'           => 'Tahniah! Anda mempunyai versi terkini Akaunting. Kemas kini keselamatan akan diterapkan secara automatik pada masa hadapan.',
+    'success'               => 'Proses kemas kini telah berjaya diselesaikan.',
+    'error'                 => 'Proses kemas kini gagal, sila cuba semula.',
 
 ];

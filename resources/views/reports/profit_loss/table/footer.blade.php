@@ -1,11 +1,26 @@
-@php $grand_total = array_sum($class->footer_totals[$table]); @endphp
+@php
+    $totals = array_replace(
+        array_fill_keys($class->dates ?? [], 0),
+        $class->footer_totals[$table_key] ?? []
+    );
+
+    $grand_total = array_sum($totals);
+@endphp
 
 <tfoot>
-    <tr class="row rp-border-top-1 font-size-unset px-3 mb-3">
-        <th class="{{ $class->column_name_width }} text-uppercase text-left">{{ trans_choice('general.totals', 1) }}</th>
-        @foreach($class->footer_totals[$table] as $total)
-            <th class="{{ $class->column_value_width }} text-right px-0">@money($total, setting('default.currency'), true)</th>
+    <tr>
+        <td class="{{ $class->column_name_width }} w-24 py-4 ltr:text-left rtl:text-right text-black-400 font-bold uppercase">
+            {{ trans('reports.total_' . $table_key) }}
+        </td>
+
+        @foreach($totals as $total)
+        <td class="{{ $class->column_value_width }} py-4 ltr:text-right rtl:text-left text-black-400 font-medium text-xs print-alignment">
+            <x-money :amount="$total" />
+        </td>
         @endforeach
-        <th class="{{ $class->column_name_width }} text-right pl-0 pr-4">@money($grand_total, setting('default.currency'), true)</th>
+
+        <td class="{{ $class->column_name_width }} py-4 ltr:text-right rtl:text-left text-black-400 font-medium text-xs print-alignment">
+            <x-money :amount="$grand_total" />
+        </td>
     </tr>
 </tfoot>

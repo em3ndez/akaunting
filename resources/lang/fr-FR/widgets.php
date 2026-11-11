@@ -2,23 +2,33 @@
 
 return [
 
-    'currencies'                => 'Devises',
-    'total_income'              => 'Recettes totales',
-    'receivables'               => 'A percevoir',
-    'open_invoices'             => 'Factures de vente en cours',
-    'overdue_invoices'          => 'Factures de vente échues',
-    'total_expenses'            => 'Dépenses totales',
-    'payables'                  => 'A payer',
-    'open_bills'                => 'Factures d\'achat en cours',
-    'overdue_bills'             => 'Factures d\'achat échues',
-    'total_profit'              => 'Bénéfice total',
-    'open_profit'               => 'Bénéfice en cours',
-    'overdue_profit'            => 'Bénéfice échu',
+    'receivables'               => 'À percevoir',
+    'payables'                  => 'À payer',
     'cash_flow'                 => 'Trésorerie',
-    'no_profit_loss'            => 'Perte nette',
-    'income_by_category'        => 'Revenus par catégorie',
-    'expenses_by_category'      => 'Dépenses par catégorie',
+    'profit_loss'               => 'Bénéfices et pertes',
+    'expenses_by_category'      => 'Principales dépenses par catégorie',
     'account_balance'           => 'Solde du compte',
-    'latest_income'             => 'Dernière recette',
-    'latest_expenses'           => 'Dernière dépense',
+    'bank_feeds'                => 'Connecter les comptes bancaires',
+    'currencies'                => 'Devises',
+
+    'view_report'               => 'Voir le rapport',
+    'total_unpaid_invoices'     => 'Montant total des factures impayées',
+    'total_unpaid_bills'        => 'Total des factures d\'achat impayées',
+
+    'description' => [
+        'receivables'           => 'Sommes que vous devez encore recevoir de vos clients',
+        'payables'              => 'Sommes que vous devez encore payer à vos fournisseurs',
+        'cash_flow'             => 'Encaissement et décaissement de votre entreprise',
+        'profit_loss'           => 'Revenus et dépenses, y compris les factures et les factures d\'achat encore impayées',
+        'expenses_by_category'  => 'Principales dépenses par catégorie',
+        'account_balance'       => 'Solde actuel de vos comptes bancaires',
+        'bank_feeds'            => 'Importez automatiquement vos transactions vers Akaunting <br />en connectant vos comptes bancaires',
+    ],
+
+    'periods' => [
+        'overdue_1_30'          => '1-30 jours de retard',
+        'overdue_31_60'         => '31-60 jours de retard',
+        'overdue_61_90'         => '61-90 jours de retard',
+        'overdue_91_un'         => '>90 jours de retard',
+    ],
 ];

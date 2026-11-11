@@ -24,7 +24,7 @@ trait Jobs
     /**
      * Dispatch a job to its appropriate handler.
      *
-     * @param  mixed  $command
+     * @param  mixed  $job
      * @return mixed
      */
     public function dispatchQueue($job)
@@ -37,27 +37,13 @@ trait Jobs
      *
      * Queuable jobs will be dispatched to the "sync" queue.
      *
-     * @param  mixed  $command
+     * @param  mixed  $job
      * @param  mixed  $handler
      * @return mixed
      */
     public function dispatchSync($job, $handler = null)
     {
         return app(Dispatcher::class)->dispatchSync($job, $handler);
-    }
-
-    /**
-     * Dispatch a command to its appropriate handler in the current process.
-     *
-     * @param mixed $job
-     * @param mixed $handler
-     * @return mixed
-     *
-     * @deprecated Will be removed in a future Laravel version.
-     */
-    public function dispatchNow($job, $handler = null)
-    {
-        return app(Dispatcher::class)->dispatchNow($job, $handler);
     }
 
     /**
@@ -82,6 +68,7 @@ trait Jobs
                 'success' => false,
                 'error' => true,
                 'data' => null,
+                'code' => $e->getCode(),
                 'message' => $e->getMessage(),
             ];
         }

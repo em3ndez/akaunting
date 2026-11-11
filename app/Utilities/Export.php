@@ -22,6 +22,11 @@ class Export
         try {
             $file_name = Str::filename($translation) . '-' . time() . '.' . $extension;
 
+            //Todo: This improvement solves the filter issue on multiple excel sheets. This solution is a temporary solution.
+            if (empty($class->ids) && method_exists($class, 'sheets') && is_array($sheets = $class->sheets())) {
+                $class->ids = ! empty($ids = (new $sheets[array_key_first($sheets)])->collection()->pluck('id')->toArray()) ? $ids : [0];
+            }
+
             if (should_queue()) {
                 $disk = 'temp';
 
@@ -43,6 +48,7 @@ class Export
                 return $class->download($file_name);
             }
         } catch (Throwable $e) {
+            report($e);
             flash($e->getMessage())->error()->important();
 
             return back();

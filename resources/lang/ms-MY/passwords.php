@@ -13,10 +13,10 @@ return [
     |
     */
 
-    'password' => 'Kata laluan mestilah sekurang-kurangnya enam aksara dan sepadan dengan pengesahan.',
     'reset' => 'Kata laluan anda telah ditetapkan semula!',
-    'sent' => 'Kami telah e-mel pautan set semula kata laluan anda!',
-    'token' => 'Token set semula kata laluan ini tidak sah.',
-    'user' => "Kami tidak dapat mencari pengguna dengan alamat e-mel tersebut.",
+    'sent' => 'Kami telah menghantar e-mel yang mengandungi pautan untuk menetapkan semula kata laluan anda!',
+    'throttled' => 'Sila tunggu sebelum mencuba semula.',
+    'token' => 'Token tetapan semula kata laluan tidak sah.',
+    'user' => "Kami tidak dapat menemui pengguna dengan alamat e-mel tersebut.",
 
 ];

@@ -2,6 +2,8 @@
 
 return [
 
+    'disk' => env('DOMPDF_DISK', null),
+
     /*
     |--------------------------------------------------------------------------
     | Settings
@@ -13,9 +15,14 @@ return [
     */
     'show_warnings' => false,   // Throw an Exception on warnings from dompdf
 
-    'orientation' => 'portrait',
+    'public_path' => null,  // Override the public path if needed
 
-    'defines' => [
+    /*
+     * Dejavu Sans font is missing glyphs for converted entities, turn it off if you need to show € and £.
+     */
+    'convert_entities' => false,
+
+    'options' => [
         /**
          * The location of the DOMPDF font directory
          *
@@ -40,7 +47,7 @@ return [
          * Times-Roman, Times-Bold, Times-BoldItalic, Times-Italic,
          * Symbol, ZapfDingbats.
          */
-        "font_dir" => storage_path('fonts/'), // advised by dompdf (https://github.com/dompdf/dompdf/pull/782)
+        "font_dir" => storage_path('fonts'), // advised by dompdf (https://github.com/dompdf/dompdf/pull/782)
 
         /**
          * The location of the DOMPDF font cache directory
@@ -50,7 +57,7 @@ return [
          *
          * Note: This directory must exist and be writable by the webserver process.
          */
-        "font_cache" => storage_path('fonts/'),
+        "font_cache" => storage_path('fonts'),
 
         /**
          * The location of a temporary directory.
@@ -71,9 +78,39 @@ return [
          * should be an absolute path.
          * This is only checked on command line call by dompdf.php, but not by
          * direct class use like:
-         * $dompdf = new DOMPDF();	$dompdf->load_html($htmldata); $dompdf->render(); $pdfdata = $dompdf->output();
+         * $dompdf = new DOMPDF();  $dompdf->load_html($htmldata); $dompdf->render(); $pdfdata = $dompdf->output();
          */
         "chroot" => realpath(base_path()),
+
+        /**
+         * Protocol whitelist
+         *
+         * Protocols and PHP wrappers allowed in URIs, and the validation rules
+         * that determine if a resouce may be loaded. Full support is not guaranteed
+         * for the protocols/wrappers specified
+         * by this array.
+         *
+         * @var array
+         */
+        'allowed_protocols' => [
+            "data://" => ["rules" => []],
+            "file://" => ["rules" => []],
+            "http://" => ["rules" => []],
+            "https://" => ["rules" => []]
+        ],
+
+        /**
+         * Operational artifact (log files, temporary files) path validation
+         *
+         * Left out on purpose: setting it, even to NULL, replaces the default
+         * validator of dompdf and turns the path check off.
+         */
+        //"artifactPathValidation" => null,
+
+         /**
+          * @var string
+          */
+        'log_output_file' => null,
 
         /**
          * Whether to enable font subsetting or not.
@@ -144,6 +181,15 @@ return [
          * @see CPDF_Adapter::PAPER_SIZES for valid sizes ('letter', 'legal', 'A4', etc.)
          */
         "default_paper_size" => "a4",
+
+         /**
+          * The default paper orientation.
+          *
+          * The orientation of the page (portrait or landscape).
+          *
+          * @var string
+          */
+        'default_paper_orientation' => "portrait",
 
         /**
          * The default font family
@@ -232,14 +278,31 @@ return [
         "enable_remote" => true,
 
         /**
+         * List of allowed remote hosts
+         *
+         * Each value of the array must be a valid hostname.
+         *
+         * This will be used to filter which resources can be loaded in combination with
+         * isRemoteEnabled. If enable_remote is FALSE, then this will have no effect.
+         *
+         * Leave to NULL to allow any remote host.
+         *
+         * @var array|null
+         */
+        "allowed_remote_hosts" => null,
+
+        /**
          * A ratio applied to the fonts height to be more like browsers' line height
          */
         "font_height_ratio" => 1.1,
 
         /**
-         * Use the more-than-experimental HTML5 Lib parser
+         * Use the HTML5 Lib parser
+         *
+         * @deprecated This feature is now always on in dompdf 2.x
+         * @var bool
          */
-        "enable_html5_parser" => false,
+        "enable_html5_parser" => true,
     ],
 
 ];

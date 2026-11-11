@@ -3,22 +3,32 @@
 namespace App\Jobs\Auth;
 
 use App\Abstracts\Job;
+use App\Events\Auth\UserCreated;
+use App\Events\Auth\UserCreating;
+use App\Exceptions\Job\NotAllowed;
 use App\Interfaces\Job\HasOwner;
 use App\Interfaces\Job\HasSource;
 use App\Interfaces\Job\ShouldCreate;
-use App\Events\Auth\UserCreated;
-use App\Events\Auth\UserCreating;
-use App\Models\Auth\User;
+use App\Traits\Plans;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Str;
 
 class CreateUser extends Job implements HasOwner, HasSource, ShouldCreate
 {
-    public function handle(): User
+    use Plans;
+
+    public function handle()
     {
+        $this->authorize();
+
         event(new UserCreating($this->request));
 
         \DB::transaction(function () {
-            $this->model = User::create($this->request->input());
+            if (empty($this->request->get('password', false))) {
+                $this->request->merge(['password' => Str::random(40)]);
+            }
+
+            $this->model = user_model_class()::create($this->request->input());
 
             // Upload picture
             if ($this->request->file('picture')) {
@@ -65,10 +75,44 @@ class CreateUser extends Job implements HasOwner, HasSource, ShouldCreate
                     'company' => $company->id,
                 ]);
             }
+
+            if ($this->shouldSendInvitation()) {
+                $this->dispatch(new CreateInvitation($this->model));
+            }
         });
+
+        $this->clearPlansCache();
 
         event(new UserCreated($this->model, $this->request));
 
         return $this->model;
+    }
+
+    /**
+     * Determine if this action is applicable.
+     */
+    public function authorize(): void
+    {
+        $limit = $this->getAnyActionLimitOfPlan();
+        if (! $limit->action_status) {
+            throw new NotAllowed($limit->message);
+        }
+    }
+
+    protected function shouldSendInvitation()
+    {
+        if (app()->runningUnitTests()) {
+            return true;
+        }
+
+        if (app()->runningInConsole()) {
+            return false;
+        }
+
+        if (request()->isInstall()) {
+            return false;
+        }
+
+        return true;
     }
 }

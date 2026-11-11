@@ -3,15 +3,15 @@
 return [
 
     'title' => [
-        '403'       => 'Üzgünüz! Erişim Yasak',
-        '404'       => 'Üzgünüz! Sayfa bulunamadı',
-        '500'       => 'Üzgünüz! Bir hata oluştu',
+        '403'       => 'Hata! Erişim Yasak',
+        '404'       => 'Hata! Sayfa bulunamadı',
+        '500'       => 'Hata! Bir şeyler ters gitti',
     ],
 
     'header' => [
         '403'       => '403 Yasak',
         '404'       => '404 Bulunamadı',
-        '500'       => '500 Sunucu Hatası',
+        '500'       => '500 İç Sunucu Hatası',
     ],
 
     'message' => [
@@ -19,6 +19,7 @@ return [
         '404'       => 'Ulaşmaya çalıştığınız sayfayı bulamadık.',
         '500'       => 'Bu sorunu gidermek için hemen işe başlıyoruz.',
         'record'    => 'Ulaşmaya çalıştığınız kaydı bulamadık.',
+        'amount'    => 'Bu sayfa geçersiz tutarlar içeriyor! Lütfen sistem yöneticisine başvurun.',
     ],
 
 ];

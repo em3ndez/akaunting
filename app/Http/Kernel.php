@@ -16,7 +16,8 @@ class Kernel extends HttpKernel
     protected $middleware = [
         \App\Http\Middleware\TrustHosts::class,
         \App\Http\Middleware\TrustProxies::class,
-        \Fruitcake\Cors\HandleCors::class,
+        \App\Http\Middleware\DisableQuic::class, // Prevent ERR_QUIC_PROTOCOL_ERROR in browsers by disabling QUIC (HTTP/3) via Alt-Svc header
+        \Illuminate\Http\Middleware\HandleCors::class,
         \Illuminate\Foundation\Http\Middleware\CheckForMaintenanceMode::class,
         \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
         \App\Http\Middleware\TrimStrings::class,
@@ -48,7 +49,8 @@ class Kernel extends HttpKernel
         ],
 
         'api' => [
-            'api.auth',
+            'header.www.authenticate', // Centralize WWW-Authenticate handling for API 401 responses
+            'auth.dynamic.once', // Unified: Bearer (OAuth) OR Basic Auth — auto-detected per request
             'auth.disabled',
             'throttle:api',
             'permission:read-api',
@@ -83,6 +85,8 @@ class Kernel extends HttpKernel
             'wizard.redirect',
             'menu.admin',
             'permission:read-admin-panel',
+            'plan.limits',
+            'module.subscription',
         ],
 
         'wizard' => [
@@ -91,6 +95,7 @@ class Kernel extends HttpKernel
             'auth.disabled',
             'company.identify',
             'bindings',
+            'read.only',
             'permission:read-admin-panel',
         ],
 
@@ -103,6 +108,16 @@ class Kernel extends HttpKernel
             'read.only',
             'menu.portal',
             'permission:read-client-portal',
+        ],
+
+        'preview' => [
+            'web',
+            'auth',
+            'auth.disabled',
+            'company.identify',
+            'bindings',
+            'read.only',
+            'permission:read-admin-panel',
         ],
 
         'signed' => [
@@ -123,16 +138,20 @@ class Kernel extends HttpKernel
         'import' => [
             'throttle:import',
         ],
+
+        'email' => [
+            'throttle:email',
+        ],
     ];
 
     /**
-     * The application's route middleware.
+     * The application's middleware aliases.
      *
-     * These middleware may be assigned to groups or used individually.
+     * Aliases may be used to conveniently assign middleware to routes and groups.
      *
-     * @var array
+     * @var array<string, class-string|string>
      */
-    protected $routeMiddleware = [
+    protected $middlewareAliases = [
         // Laravel
         'auth' => \App\Http\Middleware\Authenticate::class,
         'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
@@ -152,11 +171,17 @@ class Kernel extends HttpKernel
 
         // Akaunting
         'api.key' => \App\Http\Middleware\RedirectIfNoApiKey::class,
+        'auth.basic.once' => \App\Http\Middleware\AuthenticateOnceWithBasicAuth::class,
+        'auth.oauth.once' => \App\Http\Middleware\AuthenticateOnceWithOAuth::class,
+        'auth.dynamic.once' => \App\Http\Middleware\AuthenticateOnceWithDynamicApi::class, // Unified Bearer+Basic, per-request detection (active: api group)
         'auth.disabled' => \App\Http\Middleware\LogoutIfUserDisabled::class,
         'auth.redirect' => \App\Http\Middleware\RedirectIfAuthenticated::class,
         'company.identify' => \App\Http\Middleware\IdentifyCompany::class,
         'dropzone' => \App\Http\Middleware\Dropzone::class,
         'header.x' => \App\Http\Middleware\AddXHeader::class,
+        'header.www.authenticate' =>  \App\Http\Middleware\AddWWWAuthenticateHeader::class,
+        'plan.limits' => \App\Http\Middleware\RedirectIfHitPlanLimits::class,
+        'module.subscription' => \App\Http\Middleware\RedirectIfHitModuleSubscription::class,
         'menu.admin' => \App\Http\Middleware\AdminMenu::class,
         'menu.portal' => \App\Http\Middleware\PortalMenu::class,
         'date.format' => \App\Http\Middleware\DateFormat::class,

@@ -1,12 +1,13 @@
 <?php
 
 return [
+
     'AF' => 'Afganistan',
     'AX' => 'Kepulauan Aland',
     'AL' => 'Albania',
     'DZ' => 'Aljazair',
     'AS' => 'Samoa Amerika',
-    'AD' => 'Andora',
+    'AD' => 'Andorra',
     'AO' => 'Angola',
     'AI' => 'Anguilla',
     'AQ' => 'Antarktika',
@@ -119,6 +120,7 @@ return [
     'KZ' => 'Kazakhstan',
     'KE' => 'Kenya',
     'KI' => 'Kiribati',
+    'XK' => 'Kosovo',
     'KW' => 'Kuwait',
     'KG' => 'Kirgizstan',
     'LA' => 'Laos',
@@ -200,7 +202,7 @@ return [
     'SB' => 'Kepulauan Solomon',
     'SO' => 'Somalia',
     'ZA' => 'Afrika Selatan',
-    'GS' => 'Georgia Selatan & Kep. Sandwich Selatan',
+    'GS' => 'Georgia Selatan & Kepulauan Sandwich Selatan',
     'KR' => 'Korea Selatan',
     'SS' => 'Sudan Selatan',
     'ES' => 'Spanyol',
@@ -250,4 +252,5 @@ return [
     'YE' => 'Yaman',
     'ZM' => 'Zambia',
     'ZW' => 'Zimbabwe',
+
 ];

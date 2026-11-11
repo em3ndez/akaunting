@@ -5,9 +5,13 @@ namespace App\Jobs\Common;
 use App\Abstracts\Job;
 use App\Events\Common\CompanyUpdated;
 use App\Events\Common\CompanyUpdating;
+use App\Exceptions\Job\NotAllowed;
 use App\Interfaces\Job\ShouldUpdate;
 use App\Models\Common\Company;
+use App\Models\Setting\Currency;
 use App\Traits\Users;
+use Akaunting\Money\Currency as MoneyCurrency;
+use OutOfBoundsException;
 
 class UpdateCompany extends Job implements ShouldUpdate
 {
@@ -64,7 +68,14 @@ class UpdateCompany extends Job implements ShouldUpdate
             }
 
             if ($this->request->has('country')) {
-                setting()->set('company.country', $this->request->get('country'));
+                // Once set, the company country cannot be changed.
+                $existing_country = setting('company.country');
+
+                if (! empty($existing_country)) {
+                    $this->request->merge(['country' => $existing_country]);
+                } else {
+                    setting()->set('company.country', $this->request->get('country'));
+                }
             }
 
             if ($this->request->has('currency')) {
@@ -76,7 +87,7 @@ class UpdateCompany extends Job implements ShouldUpdate
             }
 
             if ($this->request->file('logo')) {
-                $company_logo = $this->getMedia($this->request->file('logo'), 'settings', $this->model->id);
+                $company_logo = $this->getMedia($this->request->file('logo'), 'settings', $this->model->id, null, true, 'logo');
 
                 if ($company_logo) {
                     $this->model->attachMedia($company_logo, 'company_logo');
@@ -86,6 +97,8 @@ class UpdateCompany extends Job implements ShouldUpdate
             }
 
             setting()->save();
+
+            $this->updateCurrency();
         });
 
         event(new CompanyUpdated($this->model, $this->request));
@@ -106,14 +119,47 @@ class UpdateCompany extends Job implements ShouldUpdate
         if (($this->request->get('enabled', 1) == 0) && ($this->model->id == $this->current_company_id)) {
             $message = trans('companies.error.disable_active');
 
-            throw new \Exception($message);
+            throw new NotAllowed($message);
         }
 
         // Check if user can access company
         if ($this->isNotUserCompany($this->model->id)) {
             $message = trans('companies.error.not_user_company');
 
-            throw new \Exception($message);
+            throw new NotAllowed($message);
+        }
+    }
+
+    protected function updateCurrency()
+    {
+        $currency_code = $this->request->get('currency');
+
+        if (empty($currency_code)) {
+            return;
+        }
+
+        $currency = Currency::where('company_id', $this->model->id)
+                            ->where('code', $currency_code)
+                            ->first();
+
+        if ($currency) {
+            $currency->rate = '1';
+            $currency->enabled = '1';
+
+            $currency->save();
+        } else {
+            try {
+                $data = (new MoneyCurrency($currency_code))->toArray()[$currency_code];
+                $data['rate'] = '1';
+                $data['enabled'] = '1';
+                $data['company_id'] = $this->model->id;
+                $data['code'] = $currency_code;
+                $data['created_from'] = 'core::ui';
+                $data['created_by'] = user_id();
+
+                $currency = Currency::create($data);
+            } catch (OutOfBoundsException $e) {
+            }
         }
     }
 }

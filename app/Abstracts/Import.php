@@ -2,6 +2,8 @@
 
 namespace App\Abstracts;
 
+use App\Abstracts\Http\FormRequest;
+use App\Events\Import\RowPreparing;
 use App\Traits\Import as ImportHelper;
 use App\Traits\Sources;
 use App\Utilities\Date;
@@ -11,6 +13,7 @@ use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Concerns\Importable;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Concerns\ToModel;
@@ -27,6 +30,16 @@ abstract class Import implements HasLocalePreference, ShouldQueue, SkipsEmptyRow
 
     public $user;
 
+    public $model;
+
+    public $request_class = null;
+    
+    public $with_trashed = false;
+
+    public $columns = [];
+    
+    public $has_row = null;
+
     public function __construct()
     {
         $this->user = user();
@@ -34,8 +47,15 @@ abstract class Import implements HasLocalePreference, ShouldQueue, SkipsEmptyRow
 
     public function map($row): array
     {
+        // Uploaded files may contain invalid UTF-8 (e.g. latin-1 bytes), which breaks
+        // the queue payload encoding and the insert. Sanitise the values up front.
+        $row = $this->sanitizeRowEncoding($row);
+
         $row['company_id'] = company_id();
-        $row['created_by'] = $this->user->id;
+
+        // created_by is equal to the owner id. Therefore, the value in export is owner email.
+        $row['created_by'] = $this->getCreatedById($row);
+
         $row['created_from'] = $this->getSourcePrefix() . 'import';
 
         // Make enabled field integer
@@ -48,18 +68,41 @@ abstract class Import implements HasLocalePreference, ShouldQueue, SkipsEmptyRow
             $row['reconciled'] = (int) $row['reconciled'];
         }
 
-        $date_fields = ['paid_at', 'invoiced_at', 'billed_at', 'due_at', 'issued_at', 'created_at', 'transferred_at'];
+        $date_fields = ['paid_at', 'invoiced_at', 'billed_at', 'due_at', 'issued_at', 'transferred_at'];
         foreach ($date_fields as $date_field) {
             if (!isset($row[$date_field])) {
                 continue;
             }
 
             try {
-                $row[$date_field] = Date::parse(ExcelDate::excelToDateTimeObject($row[$date_field]))
-                                        ->format('Y-m-d H:i:s');
+                $row[$date_field] = is_numeric($row[$date_field]) 
+                                    ? Date::parse(ExcelDate::excelToDateTimeObject($row[$date_field]))
+                                            ->format('Y-m-d H:i:s')
+                                    : Date::parseWithFallbackLocales($row[$date_field], null, [$this->preferredLocale()])
+                                            ->format('Y-m-d H:i:s');
             } catch (InvalidFormatException | \Exception $e) {
                 Log::info($e->getMessage());
             }
+        }
+
+        $event = new RowPreparing($this, $row);
+
+        event($event);
+
+        return $event->row;
+    }
+
+    /**
+     * Convert any string value that is not valid UTF-8 so it can be encoded safely.
+     */
+    public function sanitizeRowEncoding(array $row): array
+    {
+        foreach ($row as $key => $value) {
+            if (! is_string($value) || mb_check_encoding($value, 'UTF-8')) {
+                continue;
+            }
+
+            $row[$key] = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
         }
 
         return $row;
@@ -68,6 +111,60 @@ abstract class Import implements HasLocalePreference, ShouldQueue, SkipsEmptyRow
     public function rules(): array
     {
         return [];
+    }
+
+    /**
+     * You can override this method to add custom rules for each row.
+     */
+    public function prepareRules(array $rules): array
+    {
+        return $rules;
+    }
+
+    /**
+     * Validate each row data.
+     *
+     * @param \Illuminate\Validation\Validator $validator
+     * @throws ValidationException
+     */
+    public function withValidator($validator)
+    {
+        $condition = class_exists($this->request_class)
+                    ? ! ($request = new $this->request_class) instanceof FormRequest
+                    : true;
+
+        if ($condition) {
+            return;
+        }
+
+        foreach ($validator->getData() as $row => $data) {
+            $request->initialize(request: $data);
+
+            $rules = $this->prepareRules($request->rules());
+
+            try {
+                Validator::make($data, $rules)->validate();
+            } catch (ValidationException $e) {
+                foreach ($e->validator->failed() as $attribute => $value) {
+                    foreach ($value as $rule => $params) {
+                        if ($rule === 'In' && !empty($params)) {
+                            $actual_value = $data[$attribute] ?? 'null';
+                            $expected_values = implode(', ', $params);
+                            $custom_message = trans('validation.in_detailed', [
+                                'attribute' => $attribute,
+                                'value' => $actual_value,
+                                'values' => $expected_values
+                            ]);
+                            $validator->errors()->add($row . '.' . $attribute, $custom_message);
+                        } else {
+                            $validator->addFailure($row . '.' . $attribute, $rule, $params);
+                        }
+                    }
+                }
+
+                throw new ValidationException($validator);
+            }
+        }
     }
 
     public function chunkSize(): int
@@ -156,5 +253,47 @@ abstract class Import implements HasLocalePreference, ShouldQueue, SkipsEmptyRow
         ];
 
         return str_replace($dependent_rules, $batch_rules, $rules);
+    }
+
+    //This function is used in import classes. If the data in the row exists in the database, it is returned.
+    public function hasRow($row)
+    {
+        // must be models and columns
+        if (empty($this->model) || empty($this->columns)) {
+            return false;
+        }
+
+        /*  This function is called for each row, so the rows of the model are read once per import (once per chunk
+            on the queue) rather than once per row. The check here before compared the collection it read with the
+            model class, which never held, so the whole table was read again for every row.
+        */
+        if ($this->has_row === null) {
+            $this->has_row = $this->model::withoutEvents(function () {
+                // withTrashed() should be used if there is no deleted_at field in the table or if the deleted data is to be retrieved.
+                $query = $this->with_trashed ? $this->model::withTrashed() : $this->model::query();
+
+                // The relations are dropped before the rows are compared, so the ones a model loads by default are not loaded
+                return $query->setEagerLoads([])->get($this->columns)->each(function ($data) {
+                    $data->setAppends([]);
+                    $data->unsetRelations();
+                })->toArray();
+            });
+        }
+
+        $search_value = [];
+
+        //In the model, the fields to be searched for the row are determined.
+        foreach ($this->columns as $key) {
+            $search_value[$key] = isset($row[$key]) ? $row[$key] : null;
+        }
+
+        if (in_array($search_value, $this->has_row)) {
+            return true;
+        }
+
+        // The import saves this row before it reads the next one, so a row repeated in the file is still skipped
+        $this->has_row[] = $search_value;
+
+        return false;
     }
 }

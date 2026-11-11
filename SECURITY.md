@@ -11,8 +11,9 @@ Feel free to report security issues based on the following chart.
 | 1.2.x   | :x:                |
 | 1.3.x   | :x:                |
 | 2.0.x   | :x:                |
-| 2.1.x   | :white_check_mark: |
+| 2.1.x   | :x: |
+| 3.0.x   | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
-If you discover any security related issues, please email security@akaunting.com instead of using the issue tracker.
+If you discover any security related issues, please email security@akaunting.com instead of using the issue tracker. Ömer Çitak ([om3rcitak](https://github.com/om3rcitak)) is responsible of our security.

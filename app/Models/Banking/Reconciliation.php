@@ -11,14 +11,12 @@ class Reconciliation extends Model
 
     protected $table = 'reconciliations';
 
-    protected $dates = ['deleted_at', 'started_at', 'ended_at'];
-
     /**
      * Attributes that should be mass-assignable.
      *
      * @var array
      */
-    protected $fillable = ['company_id', 'account_id', 'started_at', 'ended_at', 'closing_balance', 'reconciled', 'created_from', 'created_by'];
+    protected $fillable = ['company_id', 'account_id', 'started_at', 'ended_at', 'closing_balance', 'transactions', 'reconciled', 'created_from', 'created_by'];
 
     /**
      * The attributes that should be cast.
@@ -26,8 +24,12 @@ class Reconciliation extends Model
      * @var array
      */
     protected $casts = [
-        'closing_balance' => 'double',
-        'reconciled' => 'boolean',
+        'closing_balance'   => 'double',
+        'reconciled'        => 'boolean',
+        'transactions'      => 'array',
+        'deleted_at'        => 'datetime',
+        'started_at'        => 'datetime',
+        'ended_at'          => 'datetime',
     ];
 
     /**
@@ -35,11 +37,44 @@ class Reconciliation extends Model
      *
      * @var array
      */
-    public $sortable = ['created_at', 'account_id', 'started_at', 'ended_at', 'closing_balance', 'reconciled'];
+    public $sortable = ['created_at', 'account_id', 'started_at', 'ended_at', 'opening_balance', 'closing_balance', 'reconciled'];
 
     public function account()
     {
-        return $this->belongsTo('App\Models\Banking\Account');
+        return $this->belongsTo('App\Models\Banking\Account')->withDefault(['name' => trans('general.na')]);
+    }
+
+    /**
+     * Get the line actions.
+     *
+     * @return array
+     */
+    public function getLineActionsAttribute()
+    {
+        $actions = [];
+
+        $actions[] = [
+            'title' => trans('general.edit'),
+            'icon' => 'edit',
+            'url' => route('reconciliations.edit', $this->id),
+            'permission' => 'update-banking-reconciliations',
+            'attributes' => [
+                'id' => 'index-line-actions-edit-reconciliation-' . $this->id,
+            ],
+        ];
+
+        $actions[] = [
+            'type' => 'delete',
+            'icon' => 'delete',
+            'route' => 'reconciliations.destroy',
+            'permission' => 'delete-banking-reconciliations',
+            'attributes' => [
+                'id' => 'index-line-actions-delete-reconciliation-' . $this->id,
+            ],
+            'model' => $this,
+        ];
+
+        return $actions;
     }
 
     /**

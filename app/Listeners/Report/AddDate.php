@@ -9,11 +9,12 @@ use App\Events\Report\FilterShowing;
 class AddDate extends Listener
 {
     protected $classes = [
-        'App\Reports\IncomeSummary',
-        'App\Reports\ExpenseSummary',
-        'App\Reports\IncomeExpenseSummary',
-        'App\Reports\ProfitLoss',
-        'App\Reports\TaxSummary',
+        \App\Reports\IncomeSummary::class,
+        \App\Reports\ExpenseSummary::class,
+        \App\Reports\IncomeExpenseSummary::class,
+        \App\Reports\ProfitLoss::class,
+        \App\Reports\TaxSummary::class,
+        \App\Reports\DiscountSummary::class,
     ];
 
     /**
@@ -28,7 +29,7 @@ class AddDate extends Listener
             return;
         }
 
-        $event->class->filters['years'] = $this->getYears();
+        $this->setDateFilter($event);
     }
 
     /**
@@ -39,6 +40,10 @@ class AddDate extends Listener
      */
     public function handleFilterApplying(FilterApplying $event)
     {
+        if ($this->skipThisClass($event)) {
+            return;
+        }
+
         if (empty($event->args['date_field'])) {
             return;
         }

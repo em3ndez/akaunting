@@ -7,15 +7,12 @@ return [
     ],
 
     'categories' => [
-        'deposit'           => 'לְהַפְקִיד',
+        'deposit'           => 'הפקדה',
         'sales'             => 'מכירות',
     ],
 
     'currencies' => [
         'usd'               => 'דולר אמריקאי',
-        'eur'               => 'יורו',
-        'gbp'               => 'לירה שטרלינג (פאונד)',
-        'try'               => 'לירה טורקית',
     ],
 
     'offline_payments' => [

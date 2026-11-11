@@ -2,13 +2,18 @@
 
 namespace Tests\Feature\Sales;
 
-use App\Exports\Sales\Invoices as Export;
+use App\Exports\Sales\Invoices\Invoices as Export;
 use App\Jobs\Document\CreateDocument;
+use App\Models\Common\Contact;
+use App\Models\Common\ContactPerson;
 use App\Models\Document\Document;
+use App\Notifications\Sale\Invoice as Notification;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Facades\Excel;
 use Tests\Feature\FeatureTestCase;
 
 class InvoicesTest extends FeatureTestCase
@@ -19,6 +24,160 @@ class InvoicesTest extends FeatureTestCase
             ->get(route('invoices.index'))
             ->assertStatus(200)
             ->assertSeeText(trans_choice('general.invoices', 2));
+    }
+
+    public function testItShouldSortInvoiceListByDocumentNumber()
+    {
+        $this->loginAs();
+
+        $document_numbers = [
+            'INV-0992',
+            'INV-0799',
+            'INV-0792',
+            'INV-0733',
+            'INV-0488',
+            'INV-0351',
+            'INV-0239',
+            'INV-1117',
+            'INV-1185',
+        ];
+
+        foreach ($document_numbers as $document_number) {
+            Document::factory()->invoice()->create([
+                'company_id' => $this->company->id,
+                'document_number' => $document_number,
+            ]);
+        }
+
+        $this->get(route('invoices.index', ['list_records' => 'all']))
+            ->assertStatus(200)
+            ->assertViewHas('invoices', function ($invoices) {
+                $document_numbers = $invoices->getCollection()
+                    ->whereIn('document_number', [
+                        'INV-0992',
+                        'INV-0799',
+                        'INV-0792',
+                        'INV-0733',
+                        'INV-0488',
+                        'INV-0351',
+                        'INV-0239',
+                        'INV-1117',
+                        'INV-1185',
+                    ])
+                    ->pluck('document_number')
+                    ->all();
+
+                return $document_numbers === [
+                    'INV-1185',
+                    'INV-1117',
+                    'INV-0992',
+                    'INV-0799',
+                    'INV-0792',
+                    'INV-0733',
+                    'INV-0488',
+                    'INV-0351',
+                    'INV-0239',
+                ];
+            });
+
+        $this->get(route('invoices.index', [
+            'list_records' => 'all',
+            'sort' => 'document_number',
+            'direction' => 'asc',
+        ]))
+            ->assertStatus(200)
+            ->assertViewHas('invoices', function ($invoices) {
+                $document_numbers = $invoices->getCollection()
+                    ->whereIn('document_number', [
+                        'INV-0992',
+                        'INV-0799',
+                        'INV-0792',
+                        'INV-0733',
+                        'INV-0488',
+                        'INV-0351',
+                        'INV-0239',
+                        'INV-1117',
+                        'INV-1185',
+                    ])
+                    ->pluck('document_number')
+                    ->all();
+
+                return $document_numbers === [
+                    'INV-0239',
+                    'INV-0351',
+                    'INV-0488',
+                    'INV-0733',
+                    'INV-0792',
+                    'INV-0799',
+                    'INV-0992',
+                    'INV-1117',
+                    'INV-1185',
+                ];
+            });
+    }
+
+    public function testItShouldShowOnlyUnpaidInvoicesOnUnpaidTab()
+    {
+        $this->loginAs();
+
+        foreach (['sent', 'viewed', 'partial', 'paid', 'draft'] as $status) {
+            Document::factory()->invoice()->create([
+                'company_id' => $this->company->id,
+                'status' => $status,
+            ]);
+        }
+
+        $this->get(route('invoices.index'))
+            ->assertStatus(200)
+            ->assertViewHas('invoices', function ($invoices) {
+                return $invoices->getCollection()
+                    ->pluck('status')
+                    ->sort()
+                    ->values()
+                    ->all() === ['partial', 'sent', 'viewed'];
+            });
+    }
+
+    public function testItShouldPreloadCustomerEmailCountOnInvoiceListPage()
+    {
+        $this->loginAs();
+
+        $customers = Contact::factory()->customer()->count(3)->create([
+            'company_id' => $this->company->id,
+        ]);
+
+        foreach ($customers as $customer) {
+            ContactPerson::create([
+                'company_id' => $this->company->id,
+                'type' => 'customer',
+                'contact_id' => $customer->id,
+                'name' => 'Contact Person',
+                'email' => 'customer' . $customer->id . '@example.com',
+                'phone' => '123-456-7890',
+            ]);
+
+            Document::factory()->invoice()->create([
+                'company_id' => $this->company->id,
+                'contact_id' => $customer->id,
+            ]);
+        }
+
+        $this->get(route('invoices.index'))
+            ->assertStatus(200)
+            ->assertViewHas('invoices', function ($invoices) {
+                foreach ($invoices as $invoice) {
+                    if (! $invoice->contact) {
+                        continue;
+                    }
+
+                    $this->assertTrue(
+                        isset($invoice->contact->contact_persons_with_email_count),
+                        'Invoice list should preload contact_persons_with_email_count for customer contacts.'
+                    );
+                }
+
+                return true;
+            });
     }
 
     public function testItShouldSeeInvoiceShowPage()
@@ -56,6 +215,44 @@ class InvoicesTest extends FeatureTestCase
         ]);
     }
 
+    public function testItShouldCreateInvoiceWithIsoDatesFromWebForm()
+    {
+        $request = $this->getRequest();
+        $request['issued_at'] = '2025-12-22 00:00:00';
+        $request['due_at'] = '2025-12-29 00:00:00';
+
+        $this->loginAs()
+            ->post(route('invoices.store'), $request)
+            ->assertStatus(200);
+
+        $this->assertFlashLevel('success');
+
+        $document = \App\Models\Document\Document::where('document_number', $request['document_number'])->firstOrFail();
+
+        $this->assertSame('2025-12-22', $document->issued_at->format('Y-m-d'));
+        $this->assertSame('2025-12-29', $document->due_at->format('Y-m-d'));
+    }
+
+    public function testItShouldNotCreateInvoiceWithInvalidRelationsThroughApi()
+    {
+        $request = $this->getRequest();
+        $request['contact_id'] = 99999;
+        $request['category_id'] = 99999;
+
+        $this->withExceptionHandling()
+            ->withHeaders([
+                'Authorization' => 'Basic ' . base64_encode('test@company.com:123456'),
+            ])
+            ->postJson(route('api.documents.store', ['search' => 'type:invoice']), $request)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors([
+                'contact_id' => trans('validation.exists', ['attribute' => 'contact id']),
+                'category_id' => trans('validation.exists', ['attribute' => 'category id']),
+            ]);
+
+        $this->assertDatabaseMissing('documents', ['document_number' => $request['document_number']]);
+    }
+
     public function testItShouldCreateInvoiceWithAttachment()
     {
         Storage::fake('uploads');
@@ -83,10 +280,12 @@ class InvoicesTest extends FeatureTestCase
         $this->assertDatabaseHas('documents', [
             'document_number' => $request['document_number']
         ]);
+
         $this->assertDatabaseHas('mediables', [
             'mediable_type' => Document::class,
             'tag'           => 'attachment',
         ]);
+
         $this->assertDatabaseHas('media', [
             'disk'           => 'uploads',
             'directory'      => '2021/05/15/1/invoices',
@@ -113,14 +312,52 @@ class InvoicesTest extends FeatureTestCase
         $request = $this->getRequest(true);
 
         $this->loginAs()
-            ->post(route('invoices.store'), $request)
+            ->post(route('recurring-invoices.store'), $request)
             ->assertStatus(200);
 
         $this->assertFlashLevel('success');
 
         $this->assertDatabaseHas('documents', [
+            'type' => Document::INVOICE_RECURRING_TYPE,
             'document_number' => $request['document_number'],
         ]);
+    }
+
+    public function testItShouldSendInvoiceEmail()
+    {
+        NotificationFacade::fake();
+
+        $invoice = $this->dispatch(new CreateDocument($this->getRequest()));
+
+        $this->loginAs()
+            ->post(route('modals.invoices.emails.store', $invoice->id), $this->getEmailRequest($invoice))
+            ->assertStatus(200);
+
+        $this->assertFlashLevel('success');
+
+        NotificationFacade::assertSentTo($invoice->contact, Notification::class);
+    }
+
+    public function testItShouldHitRateLimitForSendInvoiceEmail()
+    {
+        NotificationFacade::fake();
+
+        $limit_per_minute = (int) config('app.throttles.email.minute');
+
+        $invoice = $this->dispatch(new CreateDocument($this->getRequest()));
+
+        for ($i = 0; $i < $limit_per_minute; $i++) {
+            $this->loginAs()
+                ->post(route('modals.invoices.emails.store', $invoice->id), $this->getEmailRequest($invoice));
+        }
+
+        $this->loginAs()
+            ->post(route('modals.invoices.emails.store', $invoice->id), $this->getEmailRequest($invoice))
+            ->assertJson([
+                'success' => false,
+            ]);
+
+        NotificationFacade::assertSentTimes(Notification::class, $limit_per_minute);
     }
 
     public function testItShouldSeeInvoiceUpdatePage()
@@ -146,7 +383,7 @@ class InvoicesTest extends FeatureTestCase
         $this->loginAs()
             ->patch(route('invoices.update', $invoice->id), $request)
             ->assertStatus(200)
-			->assertSee($request['contact_email']);
+            ->assertSee($request['contact_email']);
 
         $this->assertFlashLevel('success');
 
@@ -178,16 +415,16 @@ class InvoicesTest extends FeatureTestCase
         $count = 5;
         Document::factory()->invoice()->count($count)->create();
 
-        \Excel::fake();
+        Excel::fake();
 
         $this->loginAs()
             ->get(route('invoices.export'))
             ->assertStatus(200);
 
-        \Excel::matchByRegex();
+        Excel::matchByRegex();
 
-        \Excel::assertDownloaded(
-            '/' . \Str::filename(trans_choice('general.invoices', 2)) . '-\d{10}\.xlsx/',
+        Excel::assertDownloaded(
+            '/' . str()->filename(trans_choice('general.invoices', 2)) . '-\d{10}\.xlsx/',
             function (Export $export) use ($count) {
                 // Assert that the correct export is downloaded.
                 return $export->sheets()[0]->collection()->count() === $count;
@@ -202,7 +439,7 @@ class InvoicesTest extends FeatureTestCase
 
         $invoices = Document::factory()->invoice()->count($create_count)->create();
 
-        \Excel::fake();
+        Excel::fake();
 
         $this->loginAs()
             ->post(
@@ -211,10 +448,10 @@ class InvoicesTest extends FeatureTestCase
             )
             ->assertStatus(200);
 
-        \Excel::matchByRegex();
+        Excel::matchByRegex();
 
-        \Excel::assertDownloaded(
-            '/' . \Str::filename(trans_choice('general.invoices', 2)) . '-\d{10}\.xlsx/',
+        Excel::assertDownloaded(
+            '/' . str()->filename(trans_choice('general.invoices', 2)) . '-\d{10}\.xlsx/',
             function (Export $export) use ($select_count) {
                 return $export->sheets()[0]->collection()->count() === $select_count;
             }
@@ -223,7 +460,7 @@ class InvoicesTest extends FeatureTestCase
 
     public function testItShouldImportInvoices()
     {
-        \Excel::fake();
+        Excel::fake();
 
         $this->loginAs()
             ->post(
@@ -237,7 +474,7 @@ class InvoicesTest extends FeatureTestCase
             )
             ->assertStatus(200);
 
-        \Excel::assertImported('invoices.xlsx');
+        Excel::assertImported('invoices.xlsx');
 
         $this->assertFlashLevel('success');
     }
@@ -249,5 +486,17 @@ class InvoicesTest extends FeatureTestCase
         $factory = $recurring ? $factory->invoice()->items()->recurring() : $factory->invoice()->items();
 
         return $factory->raw();
+    }
+
+    public function getEmailRequest($invoice)
+    {
+        $notification = new Notification($invoice, 'invoice_new_customer', true);
+
+        return [
+            'document_id'   => $invoice->id,
+            'to'            => [$invoice->contact->email],
+            'subject'       => $notification->getSubject(),
+            'body'          => $notification->getBody(),
+        ];
     }
 }

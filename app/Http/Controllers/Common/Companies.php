@@ -2,19 +2,28 @@
 
 namespace App\Http\Controllers\Common;
 
+use Akaunting\Money\Currency as MoneyCurrency;
 use App\Abstracts\Http\Controller;
 use App\Http\Requests\Common\Company as Request;
 use App\Jobs\Common\CreateCompany;
 use App\Jobs\Common\DeleteCompany;
 use App\Jobs\Common\UpdateCompany;
 use App\Models\Common\Company;
-use App\Models\Setting\Currency;
 use App\Traits\Uploads;
 use App\Traits\Users;
 
 class Companies extends Controller
 {
     use Uploads, Users;
+
+    public function __construct()
+    {
+        // Add CRUD permission checks to all methods only remove index method for all companies list.
+        $this->middleware('permission:create-common-companies')->only('create', 'store', 'duplicate', 'import');
+        $this->middleware('permission:read-common-companies')->only('index', 'show', 'switch', 'export', 'autocomplete');
+        $this->middleware('permission:update-common-companies')->only('edit', 'update', 'enable', 'disable');
+        $this->middleware('permission:delete-common-companies')->only('destroy');
+    }
 
     /**
      * Display a listing of the resource.
@@ -45,7 +54,13 @@ class Companies extends Controller
      */
     public function create()
     {
-        $currencies = Currency::enabled()->pluck('name', 'code');
+        $money_currencies = MoneyCurrency::getCurrencies();
+
+        $currencies = [];
+
+        foreach ($money_currencies as $key => $item) {
+            $currencies[$key] = $key . ' - ' . $item['name'];
+        }
 
         return view('common.companies.create', compact('currencies'));
     }
@@ -64,9 +79,9 @@ class Companies extends Controller
         $response = $this->ajaxDispatch(new CreateCompany($request));
 
         if ($response['success']) {
-            $response['redirect'] = route('companies.index');
+            $response['redirect'] = route('companies.switch', $response['data']->id);
 
-            $message = trans('messages.success.added', ['type' => trans_choice('general.companies', 1)]);
+            $message = trans('messages.success.created', ['type' => trans_choice('general.companies', 1)]);
 
             flash($message)->success();
         } else {
@@ -95,7 +110,13 @@ class Companies extends Controller
             return redirect()->route('companies.index');
         }
 
-        $currencies = Currency::enabled()->pluck('name', 'code');
+        $money_currencies = MoneyCurrency::getCurrencies();
+
+        $currencies = [];
+
+        foreach ($money_currencies as $key => $item) {
+            $currencies[$key] = $key . ' - ' . $item['name'];
+        }
 
         return view('common.companies.edit', compact('company', 'currencies'));
     }
@@ -214,7 +235,7 @@ class Companies extends Controller
             event(new \App\Events\Common\CompanySwitched($company, $old_company_id));
 
             // Check wizard
-            if (!setting('wizard.completed', false)) {
+            if (! setting('wizard.completed', false)) {
                 return redirect()->route('wizard.edit', ['company_id' => $company->id]);
             }
         }

@@ -2,10 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\Auth\User;
 use App\Models\Common\Contact;
 use App\Models\Document\Document;
-use App\Jobs\Common\CreateContact;
 use App\Jobs\Document\CreateDocument;
 use App\Jobs\Setting\CreateCurrency;
 use Illuminate\Support\Facades\File;
@@ -52,7 +50,7 @@ class PaymentTestCase extends FeatureTestCase
 
         $this->updateSetting();
 
-        $this->createCustomer();
+        $this->loginAsCustomer();
 
         $this->createInvoice();
 
@@ -77,13 +75,13 @@ class PaymentTestCase extends FeatureTestCase
         } elseif ($this->invoice_currency != null) {
             $this->dispatch(new CreateCurrency([
                 'company_id'            => company_id(),
-                'name'                  => config('money.' . $this->invoice_currency . '.name'),
+                'name'                  => currency($this->invoice_currency)->getName(),
                 'code'                  => $this->invoice_currency,
                 'rate'                  => config(['money.' . $this->invoice_currency . '.rate' => 1]),
                 'enabled'               => 1,
-                'symbol_first'          => config('money.' . $this->invoice_currency . '.symbol_first'),
-                'decimal_mark'          => config('money.' . $this->invoice_currency . '.decimal_mark'),
-                'thousands_separator'   => config('money.' . $this->invoice_currency . '.thousands_separator'),
+                'symbol_first'          => currency($this->invoice_currency)->isSymbolFirst(),
+                'decimal_mark'          => currency($this->invoice_currency)->getDecimalMark(),
+                'thousands_separator'   => currency($this->invoice_currency)->getThousandsSeparator(),
                 'default_currency'      => true,
             ]));
         }
@@ -140,20 +138,11 @@ class PaymentTestCase extends FeatureTestCase
         $this->invoice = $this->dispatch(new CreateDocument($this->getInvoiceRequest()));
     }
 
-    public function createCustomer()
+    public function loginAsCustomer()
     {
-        $password = $this->faker->password;
+        $this->customer = Contact::customer()->first();
 
-        $request = Contact::factory()->customer()->enabled()->raw() + [
-            'create_user' => 'true',
-            'locale' => 'en-GB',
-            'password' => $password,
-            'password_confirmation' => $password,
-        ];
-
-        $this->customer = $this->dispatch(new CreateContact($request));
-
-        $this->customer_user = User::where('email', $request['email'])->first();
+        $this->customer_user = $this->customer->user;
     }
 
     public function getInvoiceRequest()

@@ -2,16 +2,15 @@
 
 namespace App\Models\Auth;
 
+use Akaunting\Sortable\Traits\Sortable;
 use App\Traits\Tenants;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Laratrust\Models\LaratrustPermission;
 use Laratrust\Traits\LaratrustPermissionTrait;
-use Kyslik\ColumnSortable\Sortable;
 use Lorisleiva\LaravelSearchString\Concerns\SearchString;
 
 class Permission extends LaratrustPermission
 {
-    use HasFactory, LaratrustPermissionTrait, SearchString, Sortable, Tenants;
+    use LaratrustPermissionTrait, SearchString, Sortable, Tenants;
 
     protected $table = 'permissions';
 
@@ -42,9 +41,8 @@ class Permission extends LaratrustPermission
         $request = request();
 
         $search = $request->get('search');
-        $limit = (int) $request->get('limit', setting('default.list_limit', '25'));
 
-        return $query->usingSearchString($search)->sortable($sort)->paginate($limit);
+        return $query->usingSearchString($search)->sortable($sort)->paginate(list_limit());
     }
 
     /**
@@ -78,15 +76,5 @@ class Permission extends LaratrustPermission
         $title = str_replace(array_keys($replaces), array_values($replaces), $this->display_name);
 
         return $title;
-    }
-
-    /**
-     * Create a new factory instance for the model.
-     *
-     * @return \Illuminate\Database\Eloquent\Factories\Factory
-     */
-    protected static function newFactory()
-    {
-        return \Database\Factories\Permission::new();
     }
 }

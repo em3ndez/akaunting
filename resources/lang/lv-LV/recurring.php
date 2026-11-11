@@ -2,10 +2,7 @@
 
 return [
 
-    'recurring'             => 'Atkārtojošs',
-    'interval'              => 'Intervāls',
-    'frequency'             => 'Biežums',
-    'count'                 => 'Aprēķināt',
+    'recurring'             => 'Periodisks',
     'every'                 => 'Katru',
     'period'                => 'Periods',
     'times'                 => 'Skaits',
@@ -18,8 +15,28 @@ return [
     'weeks'                 => 'Nedēļa(s)',
     'months'                => 'Mēnesis(-ši)',
     'years'                 => 'Gads(-i)',
+    'frequency'             => 'Biežums',
+    'duration'              => 'Ilgums',
+    'last_issued'           => 'Pēdējais izdots',
+    'after'                 => 'Pēc',
+    'on'                    => 'Ieslēgt',
+    'never'                 => 'Nekad',
+    'ends_after'            => 'Beidzas pēc :times reizēm',
+    'ends_never'            => 'Nekad nebeidzas',
+    'ends_date'             => 'Beidzas :date',
+    'next_date'             => 'Nākamais :date',
+    'end'                   => 'Beigt atkārtoties',
+    'child'                 => ':url tika automātiski izveidots :date',
     'message'               => ':veids iestatīta atkārtošana. Nākošais :veids tiks automātiski ģenerēts :datums',
     'message_parent'        => 'Šis :veids tika ģenerēts automātiski no :links',
-    'tooltip'               => 'Papildus iepriekš noteiktajiem periodiem, iespējams pielāgot periodus attiecībā uz prasībām. <br><b>Padoms:</b> Skaitlim jābūt iestatītam uz nulli, lai tas atkārtotos bezgalīgi.',
+    'send_email_auto'       => 'Sūtīt e-pastu automātiski',
+
+    'frequency_type'        => 'Atkārtojiet :type',
+    'limit_date'            => 'Vispirms izveidojiet :type',
+    'limit_middle'          => 'un beigas',
+
+    'form_description' => [
+        'schedule'          => 'Izvēlieties noteikumus un sākuma/beigu laiku, lai nodrošinātu, ka jūsu klients saņem jūsu :type pareizajā dienā.',
+    ],
 
 ];

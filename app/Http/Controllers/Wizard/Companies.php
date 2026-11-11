@@ -54,24 +54,42 @@ class Companies extends Controller
         $file_keys = ['company.logo'];
         $uploaded_file_keys = ['company.uploaded_logo'];
 
+        // Clear setting media
+        foreach ($file_keys as $file_key) {
+            $keys = explode('.', $file_key);
+
+            if (! setting($file_key, false)) {
+                continue;
+            }
+
+            $file_old_key = 'uploaded_' . $keys[1];
+            if (array_key_exists($file_old_key, $fields)) {
+                continue;
+            }
+
+            setting()->forget($file_key);
+        }
+
         foreach ($fields as $key => $value) {
             // Don't process unwanted keys
             if (in_array($key, $skip_keys)) {
                 continue;
             }
 
-            switch ($key) {
-                case 'api_key':
-                    $real_key = 'apps.' . $key;
-                    break;
-                case 'financial_start':
-                    $real_key = 'localisation.' . $key;
-                    break;
-                case 'country':
-                    $real_key = 'company.' . $key;
-                    break;
-                default:
-                    $real_key = 'company.' . $key;
+            $real_key = match($key) {
+                'api_key'           => 'apps.api_key',
+                'financial_start'   => 'localisation.financial_start',
+                'locale'            => 'default.locale',
+                default             => 'company.' . $key,
+            };
+
+            // Once set, the company country cannot be changed.
+            if ($real_key === 'company.country') {
+                $existing_country = setting('company.country');
+
+                if (! empty($existing_country)) {
+                    continue;
+                }
             }
 
             // change dropzone middleware already uploaded file
@@ -83,7 +101,7 @@ class Companies extends Controller
              if (in_array($real_key, $file_keys)) {
                 // Upload attachment
                 if ($request->file($key)) {
-                    $media = $this->getMedia($request->file($key), 'settings');
+                    $media = $this->getMedia($request->file($key), 'settings', null, null, $real_key === 'company.logo', $key);
 
                     $company->attachMedia($media, Str::snake($real_key));
 
@@ -94,6 +112,14 @@ class Companies extends Controller
                 if (empty($value)) {
                     continue;
                 }
+            }
+
+            if ($real_key == 'default.locale') {
+                if (! in_array($value, config('language.allowed'))) {
+                    continue;
+                }
+
+                user()->setAttribute('locale', $value)->save();
             }
 
             setting()->set($real_key, $value);

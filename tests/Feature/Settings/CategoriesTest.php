@@ -4,6 +4,7 @@ namespace Tests\Feature\Settings;
 
 use App\Jobs\Setting\CreateCategory;
 use App\Models\Setting\Category;
+use Illuminate\Support\Facades\DB;
 use Tests\Feature\FeatureTestCase;
 
 class CategoriesTest extends FeatureTestCase
@@ -37,6 +38,18 @@ class CategoriesTest extends FeatureTestCase
         $this->assertDatabaseHas('categories', $request);
     }
 
+    public function testItShouldNotCreateCategoryWithInvalidParent()
+    {
+        $request = $this->getRequest();
+        $request['parent_id'] = 99999;
+
+        $this->withExceptionHandling()
+            ->loginAs()
+            ->postJson(route('categories.store'), $request)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['parent_id']);
+    }
+
     public function testItShouldSeeCategoryUpdatePage()
     {
         $request = $this->getRequest();
@@ -60,7 +73,7 @@ class CategoriesTest extends FeatureTestCase
         $this->loginAs()
             ->patch(route('categories.update', $category->id), $request)
             ->assertStatus(200)
-			->assertSee($request['name']);
+            ->assertSee($request['name']);
 
         $this->assertFlashLevel('success');
 
@@ -71,6 +84,10 @@ class CategoriesTest extends FeatureTestCase
     {
         $request = $this->getRequest();
 
+        $this->dispatch(new CreateCategory(array_merge($request, [
+            'name' => $this->faker->text(15),
+        ])));
+
         $category = $this->dispatch(new CreateCategory($request));
 
         $this->loginAs()
@@ -80,6 +97,30 @@ class CategoriesTest extends FeatureTestCase
         $this->assertFlashLevel('success');
 
         $this->assertSoftDeleted('categories', $request);
+    }
+
+    public function testItShouldGetNextCategoryCodeInOneQuery()
+    {
+        $parents = Category::factory()->count(3)->enabled()->sequence(
+            ['code' => '90000'],
+            ['code' => '90005'],
+            ['code' => 'ABC'],
+        )->create();
+
+        Category::factory()->enabled()->create([
+            'code' => '99999',
+            'parent_id' => $parents->first()->id,
+        ]);
+
+        DB::enableQueryLog();
+
+        $code = (new Category)->getNextCategoryCode();
+
+        $queries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        $this->assertEquals(90006, $code);
+        $this->assertCount(1, $queries);
     }
 
     public function getRequest()

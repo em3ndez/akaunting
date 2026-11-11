@@ -8,4 +8,8 @@ return [
         'disable_last'          => 'Kļūda: nevar atspējot pēdējo informācijas paneli. Lūdzu, vispirms izveidojiet jaunu!',
     ],
 
+    'form_description' => [
+        'general'               => 'Atlasiet lietotājus, kuriem vēlaties ļaut piekļūt jaunajam informācijas panelim.',
+    ],
+
 ];

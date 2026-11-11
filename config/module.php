@@ -175,19 +175,36 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Choose what module will register as custom namespaces.
-    | Setting one to false will require you to register that part
-    | in your own Service Provider class.
+    | Autoload
     |--------------------------------------------------------------------------
+    |
+    | Here is the load classes config.
+    |
     */
-    'register' => [
-        'translations' => true,
-        /**
-         * load files on boot or register method
-         *
-         * @example boot|register
-         */
-        'files' => 'register',
+    'autoload' => [
+        'translations'  => true,
+        'files'         => 'register',
+        'composer'      => 'register',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Activator
+    |--------------------------------------------------------------------------
+    |
+    | Here is the activator class.
+    |
+    */
+    'activator' => env('MODULE_ACTIVATOR', \App\Utilities\ModuleActivator::class),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Protected Modules
+    |--------------------------------------------------------------------------
+    |
+    | Modules listed here are part of how the app is expected to work, so they can
+    | neither be disabled nor deleted once they are installed.
+    |
+    */
+    'protected' => explode(',', env('MODULE_PROTECTED', 'double-entry')),
 ];

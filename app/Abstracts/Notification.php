@@ -2,14 +2,23 @@
 
 namespace App\Abstracts;
 
+use App\Models\Setting\EmailTemplate;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification as BaseNotification;
+use Illuminate\Support\Str;
 
 abstract class Notification extends BaseNotification implements ShouldQueue
 {
     use Queueable;
+
+    /**
+     * Custom mail subject, body, etc.
+     *
+     * @var array
+     */
+    public $custom_mail;
 
     /**
      * Create a notification instance.
@@ -33,31 +42,53 @@ abstract class Notification extends BaseNotification implements ShouldQueue
     /**
      * Initialise the mail representation of the notification.
      *
-     * @return \Illuminate\Notifications\Messages\MailMessage
      */
-    public function initMessage()
+    public function initMailMessage(): MailMessage
     {
         app('url')->defaults(['company_id' => company_id()]);
 
         $message = (new MailMessage)
             ->from(config('mail.from.address'), config('mail.from.name'))
             ->subject($this->getSubject())
-            ->view('partials.email.body', ['body' => $this->getBody()]);
+            ->view('components.email.body', ['body' => $this->getBody()]);
+
+        if (!empty($this->custom_mail['cc'])) {
+            $message->cc($this->custom_mail['cc']);
+        }
+        
+        if (!empty($this->custom_mail['bcc'])) {
+            $message->bcc($this->custom_mail['bcc']);
+        }
 
         return $message;
     }
 
-    public function getSubject()
+    /**
+     * Initialise the array representation of the notification.
+     *
+     */
+    public function initArrayMessage(): void
     {
-        return $this->replaceTags($this->template->subject);
+        app('url')->defaults(['company_id' => company_id()]);
+    }
+
+    public function getSubject(): string
+    {
+        return !empty($this->custom_mail['subject'])
+                ? $this->custom_mail['subject']
+                : $this->replaceTags($this->template->subject);
     }
 
     public function getBody()
     {
-        return $this->replaceTags($this->template->body);
+        $body = !empty($this->custom_mail['body'])
+            ? EmailTemplate::sanitizeBody($this->custom_mail['body'])
+            : $this->replaceTags($this->template->body);
+
+        return $body . $this->getFooter();
     }
 
-    public function replaceTags($content)
+    public function replaceTags(string $content): string
     {
         $pattern = $this->getTagsPattern();
         $replacement = $this->applyQuote($this->getTagsReplacement());
@@ -65,7 +96,16 @@ abstract class Notification extends BaseNotification implements ShouldQueue
         return $this->revertQuote(preg_replace($pattern, $replacement, $content));
     }
 
-    public function getTagsPattern()
+    public function getFooter()
+    {
+        $url = 'https://akaunting.com/accounting-software?utm_source=email&utm_medium=footer&utm_campaign=plg&utm_content=' . $this->template->alias;
+
+        $get_started = '<a href="' . $url . '" style="color: #676ba2; text-decoration: none;">' . trans('footer.get_started') . '</a>';
+
+        return view('components.email.footer', compact('url', 'get_started'));
+    }
+
+    public function getTagsPattern(): array
     {
         $pattern = [];
 
@@ -76,29 +116,65 @@ abstract class Notification extends BaseNotification implements ShouldQueue
         return $pattern;
     }
 
-    public function getTags()
+    public function getTags(): array
     {
         return [];
     }
 
-    public function getTagsReplacement()
+    public function getTagsReplacement(): array
     {
         return [];
     }
 
-    public function applyQuote($vars)
+    public function getTagsBinding(): array
+    {
+        $bindings = [];
+
+        $tags = $this->getTags();
+        $replacements = $this->getTagsReplacement();
+
+        $wrappers = ['{', '}'];
+
+        foreach ($tags as $index => $tag) {
+            $key = Str::replace($wrappers, '', $tag);
+
+            $value = $replacements[$index] ?? '';
+
+            // HTML-encode string replacement values to prevent stored XSS (CWE-79).
+            // Notification description templates contain intentional HTML markup
+            // (<strong>, <a>) which must be preserved. This encodes only the
+            // user-supplied values (e.g. customer_name, vendor_name, email)
+            // while leaving the template's own markup untouched. Non-string
+            // values (Money, Carbon dates, numeric amounts) pass through
+            // unchanged since they do not carry attacker-controlled HTML.
+            $bindings[$key] = is_string($value) ? e($value) : $value;
+        }
+
+        return $bindings;
+    }
+
+    public function applyQuote(array $vars): array
     {
         $new_vars = [];
 
         foreach ($vars as $var) {
-            $new_vars[] = preg_quote($var);
+            // Ensure $var is a string, default to an empty string if it is null
+            $new_vars[] = preg_quote($var ?? '');
         }
 
         return $new_vars;
     }
 
-    public function revertQuote($content)
+    public function revertQuote(string $content): string
     {
         return str_replace('\\', '', $content);
+    }
+
+    /**
+     * @deprecated 3.0
+     */
+    public function initMessage()
+    {
+        return $this->initMailMessage();
     }
 }

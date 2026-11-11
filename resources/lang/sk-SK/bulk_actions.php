@@ -20,4 +20,7 @@ return [
         'unreconcile'   => 'Ste si istý že chcete <b>rozdeliť</b> vybraný záznam?|Ste si istý že chcete <b>rozdeliť</b> vybrané záznamy?',
     ],
 
+    'success' => [
+        'general'       => ':count záznam(ov) :type.',
+    ],
 ];

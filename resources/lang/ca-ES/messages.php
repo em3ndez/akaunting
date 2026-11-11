@@ -4,6 +4,7 @@ return [
 
     'success' => [
         'added'             => 'S\'ha afegit :type!',
+        'created'            => ':type creat!',
         'updated'           => 'S\'ha actualitzat :type!',
         'deleted'           => 'S\'ha esborrat :type!',
         'duplicated'        => 'S\'ha duplicat :type!',
@@ -11,8 +12,12 @@ return [
         'import_queued'     => 'S\'ha planificat la importació de :type. Rebràs un correu quan hagi acabat.',
         'exported'          => 'S\'ha exportat :type!',
         'export_queued'     => 'S\'ha planificat l\'exportació de :type. Rebràs un correu quan estigui llesta per la descàrrega.',
+        'download_queued'   => 'S\'ha planificat la descàrrega de :type. Rebràs un correu quan estigui llesta per la descàrrega.',
         'enabled'           => 'S\'ha activat :type!',
         'disabled'          => 'S\'ha desactivat :type!',
+        'connected'         => ':type connectat!',
+        'invited'           => ':type convidat!',
+        'ended'             => ':type finalitzat!',
 
         'clear_all'         => 'Fet! Has esborrat tots els :type.',
     ],
@@ -23,10 +28,15 @@ return [
         'customer'          => 'Error: No s\'ha creat l\'usuari! :name ja utilitza aquesta adreça de correu electrònic.',
         'no_file'           => 'Error: No s\'ha seleccionat cap fitxer!',
         'last_category'     => 'Error: No es pot esborrar l\'últim :type de categoria!',
+        'transfer_category' => 'Error: No es pot esborrar l\'última categoria de :type!',
+        'transfer_transaction' => 'Error: No podeu canviar/esborrar la transacció perquè pertany a una transferència!',
         'change_type'       => 'Error: No es pot canviar el tipus perquè té :text relacionat!',
         'invalid_apikey'    => 'Error: La clau API proporcionada no és vàlida!',
+        'empty_apikey'      => 'Error: No has introduït la teva clau API! <a href=":url" class="font-bold underline underline-offset-4">Prem aquí</a> per introduir-la.',
         'import_column'     => 'Error: :message Nom de la pàgina: :sheet. Número de línia: :line.',
         'import_sheet'      => 'Error: Nom de pàgina no vàlid. Si us plau, comprova el fitxer de mostra.',
+        'same_amount'       => 'Error: l\'import total de la divisió ha de ser exactament el mateix que el total de :transaction: :amount',
+        'over_match'        => 'Error: :type no connectat! L\'import que heu introduït no pot superar el total del pagament: :amount',
     ],
 
     'warning' => [
@@ -36,6 +46,8 @@ return [
         'reconciled_doc'    => 'Avís: No pots canviar/esborrar :type perquè conté transaccions conciliades!',
         'disable_code'      => 'Avís: No pots desactivar o canviar la moneda de <b>:name</b> perquè té :text relacionat.',
         'payment_cancel'    => 'Avís: Has cancel·lat el teu pagament recent :method!',
+        'missing_transfer'  => 'Avís: No es troba la transferència relativa a aquesta transacció. S\'hauria d\'esborrar la transacció.',
+        'connect_tax'       => 'Avís: Aquest :type té un import d\'impost. Els impostos afegits a :type no es poden enllaçar, per tant l\'impost s\'afegirà al total.',
     ],
 
 ];

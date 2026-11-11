@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Common;
 
 use App\Abstracts\Http\FormRequest;
+use Illuminate\Support\Str;
 
 class Contact extends FormRequest
 {
@@ -14,20 +15,18 @@ class Contact extends FormRequest
     public function rules()
     {
         $email = '';
-        $required = '';
         $logo = 'nullable';
 
         $type = $this->request->get('type', 'customer');
 
-        // @todo must put contact types under a specific array, see category
-        if (empty(config('type.' . $type))) {
+        if (empty(config('type.contact.' . $type))) {
             $type = null;
         }
 
-        $company_id = (int) $this->request->get('company_id');
+        $company_id = (int) $this->request->get('company_id', company_id());
 
         // Check if store or update
-        if ($this->getMethod() == 'PATCH') {
+        if (in_array($this->getMethod(), ['PATCH', 'PUT'])) {
             $model = $this->isApi() ? 'contact' : $type;
 
             $id = is_numeric($this->$model) ? $this->$model : $this->$model->getAttribute('id');
@@ -35,12 +34,8 @@ class Contact extends FormRequest
             $id = null;
         }
 
-        if (($this->request->get('create_user', 'false') === 'true') && empty($this->request->get('user_id'))) {
-            $required = 'required|';
-        }
-
         if (!empty($this->request->get('email'))) {
-            $email .= 'email|unique:contacts,NULL,'
+            $email .= 'email:rfc,dns|unique:contacts,NULL,'
                       . $id . ',id'
                       . ',company_id,' . $company_id
                       . ',type,' . $type
@@ -52,18 +47,43 @@ class Contact extends FormRequest
         }
 
         if ($this->files->get('logo')) {
-            $logo = 'mimes:' . config('filesystems.mimes') . '|between:0,' . config('filesystems.max_size') * 1024 . '|dimensions:max_width=1000,max_height=1000';
+            $logo = 'mimes:' . config('filesystems.mimes')
+                    . '|between:0,' . config('filesystems.max_size') * 1024
+                    . '|dimensions:max_width=' . config('filesystems.max_width') . ',max_height=' . config('filesystems.max_height');
         }
 
-        return [
-            'type' => 'required|string',
-            'name' => 'required|string',
-            'email' => $email,
-            'user_id' => 'integer|nullable',
+        $rules = [
+            'type'          => 'required|string',
+            'name'          => 'required|string|max:255',
+            'email'         => $email,
+            'user_id'       => 'integer|nullable|exists:users,id,deleted_at,NULL',
             'currency_code' => 'required|string|currency',
-            'password' => $required . 'confirmed',
-            'enabled' => 'integer|boolean',
-            'logo' => $logo,
+            'enabled'       => 'integer|boolean',
+            'logo'          => $logo,
+        ];
+
+        if ($this->request->has('contact_persons')) {
+            $rules = array_merge($rules, [
+                'contact_persons.*.name'    => 'nullable|string|max:255',
+                'contact_persons.*.email'   => 'nullable|email:rfc,dns',
+                'contact_persons.*.phone'   => 'nullable|string',
+            ]);
+        }
+
+        return $rules;
+    }
+
+    public function messages()
+    {
+        $logo_dimensions = trans('validation.custom.invalid_dimension', [
+            'attribute'     => Str::lower(trans_choice('general.pictures', 1)),
+            'width'         => config('filesystems.max_width'),
+            'height'        => config('filesystems.max_height'),
+        ]);
+
+        return [
+            'logo.dimensions' => $logo_dimensions,
+            'contact_persons.*.email.email' => trans('validation.email', ['attribute' => Str::lower(trans('general.email'))])
         ];
     }
 }

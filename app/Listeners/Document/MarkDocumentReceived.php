@@ -18,19 +18,24 @@ class MarkDocumentReceived
      */
     public function handle(Event $event)
     {
-        if ($event->document->status != 'partial') {
+        if (! in_array($event->document->status, ['partial', 'paid'])) {
             $event->document->status = 'received';
+
+            //This control will be removed when approval status is added to documents.
+            if ($event->document->amount == 0) {
+                $event->document->status = 'paid';
+            }
 
             $event->document->save();
         }
 
         $type_text = '';
 
-        if ($alias = config('type.' . $event->document->type . '.alias', '')) {
+        if ($alias = config('type.document.' . $event->document->type . '.alias', '')) {
             $type_text .= $alias . '::';
         }
 
-        $type_text .= 'general.' . config('type.' . $event->document->type .'.translation.prefix');
+        $type_text .= 'general.' . config('type.document.' . $event->document->type .'.translation.prefix');
 
         $type = trans_choice($type_text, 1);
 

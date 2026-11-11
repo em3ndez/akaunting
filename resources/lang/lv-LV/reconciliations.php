@@ -14,5 +14,9 @@ return [
     'cleared_amount'        => 'Dzēšamā summa',
     'deposit'               => 'Ieņēmumi',
     'withdrawal'            => 'Atsaukt',
+    'reconciled_amount'     => 'Saskaņots',
+    'in_progress'           => 'Procesā',
+    'save_draft'            => 'Saglabāt melnrakstu',
+    'irreconcilable'        => 'Nesamierināms',
 
 ];

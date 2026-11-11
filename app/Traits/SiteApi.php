@@ -2,7 +2,9 @@
 
 namespace App\Traits;
 
+use Akaunting\Version\Version;
 use App\Utilities\Info;
+use Composer\CaBundle\CaBundle;
 use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
@@ -14,13 +16,13 @@ trait SiteApi
 
     protected static function siteApiRequest($method, $path, $extra_data = [])
     {
-        $client = new Client(['verify' => false, 'base_uri' => static::$base_uri]);
+        $client = new Client(['verify' => CaBundle::getSystemCaRootBundlePath(), 'base_uri' => static::$base_uri]);
 
         $headers['headers'] = [
-            'Authorization' => 'Bearer ' . setting('apps.api_key'),
+            'Authorization' => 'Bearer ' . Info::getApiKey(),
             'Accept'        => 'application/json',
             'Referer'       => app()->runningInConsole() ? config('app.url') : url('/'),
-            'Akaunting'     => version('short'),
+            'Akaunting'     => Version::short(),
             'Language'      => language()->getShortCode(),
             'Information'   => json_encode(Info::all()),
         ];
@@ -31,7 +33,7 @@ trait SiteApi
             'http_errors' => false,
         ], $extra_data);
 
-        $options = array_merge($data, $headers);
+        $options = array_merge_recursive($data, $headers);
 
         try {
             $response = $client->request($method, $path, $options);
@@ -55,15 +57,24 @@ trait SiteApi
         return $response;
     }
 
-    public static function getResponseData($method, $path, $data = [], $status_code = 200)
+    public static function getResponseBody($method, $path, $data = [], $status_code = 200)
     {
-        if (!$response = static::getResponse($method, $path, $data, $status_code)) {
+        if (! $response = static::getResponse($method, $path, $data, $status_code)) {
             return [];
         }
 
         $body = json_decode($response->getBody());
 
-        if (!is_object($body)) {
+        return $body;
+    }
+
+    public static function getResponseData($method, $path, $data = [], $status_code = 200)
+    {
+        if (! $body = static::getResponseBody($method, $path, $data, $status_code)) {
+            return [];
+        }
+
+        if (! is_object($body)) {
             return [];
         }
 

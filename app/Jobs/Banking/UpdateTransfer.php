@@ -3,19 +3,26 @@
 namespace App\Jobs\Banking;
 
 use App\Abstracts\Job;
+use App\Events\Banking\TransferUpdated;
+use App\Events\Banking\TransferUpdating;
+use App\Exceptions\Job\NotFound;
 use App\Interfaces\Job\ShouldUpdate;
 use App\Models\Banking\Account;
 use App\Models\Banking\Transaction;
 use App\Models\Banking\Transfer;
-use App\Models\Setting\Category;
+use App\Traits\Categories;
 use App\Traits\Currencies;
 
 class UpdateTransfer extends Job implements ShouldUpdate
 {
-    use Currencies;
+    use Categories, Currencies;
 
     public function handle(): Transfer
     {
+        $this->authorize();
+
+        event(new TransferUpdating($this->model, $this->request));
+
         \DB::transaction(function () {
             // Upload attachment
             if ($this->request->file('attachment')) {
@@ -26,7 +33,9 @@ class UpdateTransfer extends Job implements ShouldUpdate
 
                     $this->model->attachMedia($media, 'attachment');
                 }
-            } elseif (!$this->request->file('attachment') && $this->model->attachment) {
+            } elseif ($this->request->isNotApi() && ! $this->request->file('attachment') && $this->model->attachment) {
+                $this->deleteMediaModel($this->model, 'attachment', $this->request);
+            } elseif ($this->request->isApi() && $this->request->has('remove_attachment') && $this->model->attachment) {
                 $this->deleteMediaModel($this->model, 'attachment', $this->request);
             }
 
@@ -41,7 +50,7 @@ class UpdateTransfer extends Job implements ShouldUpdate
 
             $expense_transaction->update([
                 'company_id' => $this->request['company_id'],
-                'type' => 'expense',
+                'type' => Transaction::EXPENSE_TRANSFER_TYPE,
                 'account_id' => $this->request->get('from_account_id'),
                 'paid_at' => $this->request->get('transferred_at'),
                 'currency_code' => $expense_currency_code,
@@ -49,7 +58,7 @@ class UpdateTransfer extends Job implements ShouldUpdate
                 'amount' => $this->request->get('amount'),
                 'contact_id' => 0,
                 'description' => $this->request->get('description'),
-                'category_id' => Category::transfer(), // Transfer Category ID
+                'category_id' => $this->getTransferCategoryId(),
                 'payment_method' => $this->request->get('payment_method'),
                 'reference' => $this->request->get('reference'),
             ]);
@@ -63,7 +72,7 @@ class UpdateTransfer extends Job implements ShouldUpdate
 
             $income_transaction->update([
                 'company_id' => $this->request['company_id'],
-                'type' => 'income',
+                'type' => Transaction::INCOME_TRANSFER_TYPE,
                 'account_id' => $this->request->get('to_account_id'),
                 'paid_at' => $this->request->get('transferred_at'),
                 'currency_code' => $income_currency_code,
@@ -71,7 +80,7 @@ class UpdateTransfer extends Job implements ShouldUpdate
                 'amount' => $amount,
                 'contact_id' => 0,
                 'description' => $this->request->get('description'),
-                'category_id' => Category::transfer(), // Transfer Category ID
+                'category_id' => $this->getTransferCategoryId(),
                 'payment_method' => $this->request->get('payment_method'),
                 'reference' => $this->request->get('reference'),
             ]);
@@ -83,7 +92,27 @@ class UpdateTransfer extends Job implements ShouldUpdate
             ]);
         });
 
+        event(new TransferUpdated($this->model, $this->request));
+
         return $this->model;
+    }
+
+    public function authorize(): void
+    {
+        // Same check as in UpdateTransaction, for both transactions of the transfer
+        if ($this->model->expense_transaction?->reconciled || $this->model->income_transaction?->reconciled) {
+            $message = trans('messages.warning.reconciled_tran');
+
+            throw new \Exception($message);
+        }
+
+        foreach (['from', 'to'] as $type) {
+            $account_id = $this->request->get($type . '_account_id');
+
+            if (empty($account_id) || ! Account::find($account_id)) {
+                throw new NotFound(trans('messages.error.not_found', ['type' => trans_choice('general.accounts', 1)]));
+            }
+        }
     }
 
     protected function getCurrencyCode($type)
@@ -102,7 +131,7 @@ class UpdateTransfer extends Job implements ShouldUpdate
         $currency_rate = $this->request->get($type . '_account_rate');
 
         if (empty($currency_rate)) {
-            $currency_rate = config('money.' . $this->getCurrencyCode($type) . '.rate');
+            $currency_rate = currency($this->getCurrencyCode($type))->getRate();
         }
 
         return $currency_rate;

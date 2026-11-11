@@ -20,5 +20,4 @@ return [
         '500'       => 'Teemme parhaamme korjataksemme sen pikimmiten.',
         'record'    => 'Emme löytäneet sivua, jota olit etsimässä.',
     ],
-
 ];

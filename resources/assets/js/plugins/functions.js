@@ -15,6 +15,31 @@ function getQueryVariable(variable) {
     return(false);
 }
 
+function removeURLParameter(param) {
+    let url = window.location.href;
+    let regex = new RegExp("[?&]" + param + "(=[^&#]*)?", "g");
+
+    url = url.replace(regex, "");
+    url = url.replace(/[?&]$/, "");
+
+    window.history.replaceState({}, document.title, url);
+}
+
+const { evaluate } = require('mathjs');
+
+// use the evaluate function to evaluate the expression
+function calculationToQuantity(quantity) {
+    let expression = quantity.toString().trim();
+
+    // Only plain arithmetic reaches the parser, mirroring calculation_to_quantity() on the
+    // server, so no symbol, function or property access can be evaluated in the browser.
+    if (! /^[0-9,+\-x*\/().\s]+$/i.test(expression) || expression.length > 255) {
+        return NaN;
+    }
+
+    return evaluate(expression.replace(/,/g, '.').replace(/x/gi, '*'));
+}
+
 //This function wraps setTimeout function in a promise in order to display dom manipulations on root components asynchronously & fast 
 const setPromiseTimeout = time => 
     new Promise(resolve => 
@@ -23,4 +48,4 @@ const setPromiseTimeout = time =>
         , time)
     );
 
-export {getQueryVariable, setPromiseTimeout}
+export {getQueryVariable, removeURLParameter, calculationToQuantity, setPromiseTimeout}

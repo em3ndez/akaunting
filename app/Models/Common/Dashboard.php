@@ -21,15 +21,6 @@ class Dashboard extends Model
     protected $fillable = ['company_id', 'name', 'enabled', 'created_from', 'created_by'];
 
     /**
-     * The attributes that should be cast.
-     *
-     * @var array
-     */
-    protected $casts = [
-        'enabled' => 'boolean',
-    ];
-
-    /**
      * Sortable columns.
      *
      * @var array
@@ -38,7 +29,7 @@ class Dashboard extends Model
 
     public function users()
     {
-        return $this->belongsToMany('App\Models\Auth\User', 'App\Models\Auth\UserDashboard');
+        return $this->belongsToMany(user_model_class(), 'App\Models\Auth\UserDashboard');
     }
 
     public function widgets()
@@ -112,6 +103,51 @@ class Dashboard extends Model
         }
 
         return $alias;
+    }
+
+    /**
+     * Get the line actions.
+     *
+     * @return array
+     */
+    public function getLineActionsAttribute()
+    {
+        $actions = [];
+
+        if ($this->enabled) {
+            $actions[] = [
+                'title' => trans('general.switch'),
+                'icon' => 'settings_ethernet',
+                'url' => route('dashboards.switch', $this->id),
+                'permission' => 'read-common-dashboards',
+                'attributes' => [
+                    'id' => 'index-line-actions-switch-dashboard-' . $this->id,
+                ],
+            ];
+        }
+
+        $actions[] = [
+            'title' => trans('general.edit'),
+            'icon' => 'edit',
+            'url' => route('dashboards.edit', $this->id),
+            'permission' => 'update-common-dashboards',
+            'attributes' => [
+                'id' => 'index-line-actions-edit-dashboard-' . $this->id,
+            ],
+        ];
+
+        $actions[] = [
+            'type' => 'delete',
+            'icon' => 'delete',
+            'route' => 'dashboards.destroy',
+            'permission' => 'delete-common-dashboards',
+            'attributes' => [
+                'id' => 'index-line-actions-delete-dashboard-' . $this->id,
+            ],
+            'model' => $this,
+        ];
+
+        return $actions;
     }
 
     /**

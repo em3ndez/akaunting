@@ -3,21 +3,23 @@
 return [
 
     'title' => [
-        '403' => 'Oops! Akses Terlarang',
-        '404' => 'Oops! Halaman tidak dijumpai',
-        '500' => 'Oops! Ada sesuatu yang salah',
+        '403'       => 'Ups! Akses Dilarang',
+        '404'       => 'Ups! Halaman tidak ditemukan',
+        '500'       => 'Ups! Terjadi kesalahan',
     ],
 
     'header' => [
-        '403' => '403 Dilarang',
-        '404' => '404 Tidak Ditemui',
-        '500' => '500 Kesilapan Program Induk Dalaman',
+        '403'       => '403 Dilarang',
+        '404'       => '404 Tidak ditemukan',
+        '500'       => '500 Ralat Pelayan Dalaman',
     ],
 
     'message' => [
-        '403' => 'Anda tidak dibenarkan mengakses laman ini.',
-        '404' => 'Kami tidak menemui laman yang dicari.',
-        '500' => 'Kami akan perbaikinya dengan kadar segera.',
+        '403'       => 'Anda tidak boleh mengakses halaman ini.',
+        '404'       => 'Kami tidak dapat menemui halaman yang anda cari.',
+        '500'       => 'Kami akan mengusahakan pembetulan serta-merta.',
+        'record'    => 'Kami tidak dapat menemui rekod yang anda cari.',
+        'amount'    => 'Halaman ini mengandungi jumlah yang tidak sah! Sila hubungi pentadbir sistem.',
     ],
 
 ];

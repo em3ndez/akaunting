@@ -17,11 +17,12 @@ return [
     ],
 
     'requirements' => [
-        'enabled'           => ':iezīme ir jāiespējo!',
+        'enabled'           => ':feature ir jāiespējo!',
         'disabled'          => ':iezīmee ir jāatspējo!',
         'extension'         => ':paplašinājumi nepieciešams ielādēt!',
         'directory'         => ':direktorijs direktorijai jābūt rakstīšanas tiesībām!',
         'executable'        => 'PHP CLI izpildāmais fails nav definēts/nedarbojas vai tā versija nav :php_version vai augstāka! Lūdziet savam uzturētājuzņēmumam uzstatīt PHP_BINARY vai PHP_PATH vides mainīgo pareizi.',
+        'npm'               => '<b>Trūkst JavaScript failu !</b> <br><br><span>You should run <em class="underline">npm install</em> and <em class="underline">npm run dev</em> instalēšanas komandas.</span>', 
     ],
 
     'database' => [
@@ -43,4 +44,8 @@ return [
         'connection'        => 'Kļūda: Nevar savienoties ar datubāzi. Lūdzu pārliecinies, ka dati ir pareizi.',
     ],
 
+    'update' => [
+        'core'              => 'Akaunting jauna versija ir pieejama! Lūdzu, atjauniniet savu instalāciju.',
+        'module'            => ':module ir pieejama jaunā versija! Lūdzu, atjauniniet savu instalāciju.',
+    ],
 ];

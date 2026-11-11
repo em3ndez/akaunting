@@ -7,7 +7,6 @@ use App\Interfaces\Job\HasOwner;
 use App\Interfaces\Job\HasSource;
 use App\Interfaces\Job\ShouldCreate;
 use App\Jobs\Common\CreateWidget;
-use App\Models\Auth\User;
 use App\Models\Common\Company;
 use App\Models\Common\Dashboard;
 use App\Models\Common\Widget;
@@ -57,7 +56,7 @@ class CreateDashboard extends Job implements HasOwner, HasSource, ShouldCreate
             $user_ids = Arr::wrap($this->request->get('users'));
 
             foreach($user_ids as $user_id) {
-                $user = User::find($user_id);
+                $user = user_model_class()::find($user_id);
 
                 if (!$this->shouldCreateDashboardFor($user)) {
                     continue;
@@ -95,7 +94,13 @@ class CreateDashboard extends Job implements HasOwner, HasSource, ShouldCreate
         $sort = 1;
 
         if ($this->request->has('default_widgets')) {
-            $widgets = Widgets::getClasses($this->request->get('default_widgets'), false);
+            $default_widgets = $this->request->get('default_widgets');
+
+            if (! is_array($default_widgets) && ($default_widgets == 'core')) {
+                Widgets::optimizeCoreWidgets();
+            }
+
+            $widgets = Widgets::getClasses($default_widgets, false);
 
             $this->createWidgets($widgets, $sort);
         }
@@ -129,6 +134,8 @@ class CreateDashboard extends Job implements HasOwner, HasSource, ShouldCreate
                     'name' => $name,
                     'sort' => $sort,
                     'settings' => (new $class())->getDefaultSettings(),
+                    'created_from' => $this->model->created_from,
+                    'created_by' => $this->model->created_by,
                 ]));
             }
 

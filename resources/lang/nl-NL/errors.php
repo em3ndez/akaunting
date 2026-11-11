@@ -10,8 +10,8 @@ return [
 
     'header' => [
         '403'       => '403 Verboden',
-        '404'       => '404 niet gevonden',
-        '500'       => '500 Interne serverfout',
+        '404'       => '404 Niet Gevonden',
+        '500'       => '500 Interne Serverfout',
     ],
 
     'message' => [
@@ -19,6 +19,7 @@ return [
         '404'       => 'We konden de pagina die je zocht niet vinden.',
         '500'       => 'We gaan meteen opzoek naar een oplossing,',
         'record'    => 'We konden het record dat u zocht niet vinden.',
+        'amount'    => 'Deze pagina bevat ongeldige bedragen! Neem contact op met de systeembeheerder.',
     ],
 
 ];

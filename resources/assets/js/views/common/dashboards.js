@@ -42,11 +42,13 @@ const dashboard = new Vue({
         return {
             widget_modal: false,
             widgets: {},
+            widget_settings: {},
             widget: {
                 id: 0,
                 name: '',
                 class: '',
                 width: '',
+                limit: '',
                 action: 'create',
                 sort: 0,
             },
@@ -67,6 +69,107 @@ const dashboard = new Vue({
         }
 
         this.getWidgets();
+
+        // dashboard slider starting
+        const slider = document.getElementById('dashboard-slider');
+        const scrollLeft = document.getElementById('dashboard-left');
+        const scrollRight = document.getElementById('dashboard-right');
+
+        const isRtl = document.documentElement.dir === 'rtl';
+
+        if (slider && scrollLeft && scrollRight) {
+            scrollLeft.addEventListener('click', () => scrollToItem('left'));
+            scrollRight.addEventListener('click', () => scrollToItem('right'));
+        }
+
+        function scrollToItem(direction) {
+            if (direction == 'right') {
+                scrollLeft.classList.add('text-purple');
+                scrollLeft.classList.remove('text-purple-200');
+                scrollLeft.removeAttribute('disabled');
+            }
+
+            if (direction == 'left') {
+                scrollRight.classList.add('text-purple');
+                scrollRight.classList.remove('text-purple-200');
+
+                scrollRight.removeAttribute('disabled');
+            }
+
+            const visibleItems = Array.from(slider.children);
+            const sliderRect = slider.getBoundingClientRect();
+
+            const currentIndex = visibleItems.findIndex(item => {
+                const itemRect = item.getBoundingClientRect();
+
+                return itemRect.left >= sliderRect.left && itemRect.right <= sliderRect.right;
+            });
+
+            // In RTL, items flow right-to-left so physical direction is reversed
+            const effectiveDirection = isRtl ? (direction === 'right' ? 'left' : 'right') : direction;
+            const nextIndex = effectiveDirection === 'right' ? currentIndex + 1 : currentIndex - 1;
+
+            if (nextIndex == 0) {
+                const startButton = isRtl ? scrollRight : scrollLeft;
+                startButton.classList.add('text-purple-200');
+                startButton.classList.remove('text-purple');
+
+                startButton.setAttribute('disabled', 'disabled');
+            }
+
+            if (nextIndex >= 0 && nextIndex < visibleItems.length) {
+                const nextItem = visibleItems[nextIndex];
+                const scrollAmount = nextItem.getBoundingClientRect().left - sliderRect.left;
+
+                slider.scrollBy({
+                    left: isRtl ? -scrollAmount : scrollAmount,
+                    behavior: 'smooth'
+                });
+            }
+
+            const tolerance = 5; // Pixel tolerance
+            const atEnd = isRtl
+                ? Math.abs(slider.scrollLeft) + slider.clientWidth >= slider.scrollWidth - tolerance
+                : slider.scrollLeft + slider.clientWidth >= slider.scrollWidth - tolerance;
+
+            if (atEnd) {
+                const endButton = isRtl ? scrollLeft : scrollRight;
+                endButton.classList.add('text-purple-200');
+                endButton.classList.remove('text-purple');
+
+                endButton.setAttribute('disabled', 'disabled');
+            }
+        }
+
+        function updateSlider() {
+            const sliderWidth = slider.clientWidth;
+            const windowWidth = window.innerWidth;
+
+            if (sliderWidth <= 850) {
+                slider.parentElement.classList.remove('w-9/12', 'w-8/12');
+
+                scrollLeft.classList.add('hidden');
+                scrollRight.classList.add('hidden');
+            } else {
+                if (windowWidth < 1396) {
+                    slider.parentElement.classList.remove('w-9/12');
+                    slider.parentElement.classList.add('w-8/12');
+                } else {
+                    slider.parentElement.classList.remove('w-8/12');
+                    slider.parentElement.classList.add('w-9/12');
+                }
+
+                scrollLeft.classList.remove('hidden');
+                scrollRight.classList.remove('hidden');
+            }
+        }
+
+        if (slider && scrollLeft && scrollRight) {
+            updateSlider();
+
+            window.addEventListener('resize', updateSlider);
+        }
+        // dashboard slider ending
     },
 
     methods:{
@@ -76,7 +179,8 @@ const dashboard = new Vue({
 
             axios.get(url + '/common/widgets')
             .then(function (response) {
-                self.widgets = response.data;
+                self.widgets = response.data.types;
+                self.widget_settings = response.data.settings;
             })
             .catch(function (error) {
             });
@@ -96,7 +200,8 @@ const dashboard = new Vue({
                 self.widget.id = widget_id;
                 self.widget.name = response.data.name;
                 self.widget.class = response.data.class;
-                self.widget.width = response.data.settings.width;
+                self.widget.width = (response.data.settings.raw_width) ? response.data.settings.raw_width : response.data.settings.width;
+                self.widget.limit = response.data.settings.limit;
                 self.widget.action = 'edit';
                 self.widget.sort = response.data.sort;
 
@@ -114,6 +219,7 @@ const dashboard = new Vue({
             this.widget.name = '';
             this.widget.class = '';
             this.widget.width = '';
+            this.widget.limit = '';
             this.widget.action = 'create';
             this.widget.sort = 0;
         },

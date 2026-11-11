@@ -82,7 +82,7 @@ class Currencies extends Controller
         if ($response['success']) {
             $response['redirect'] = route('currencies.index');
 
-            $message = trans('messages.success.added', ['type' => trans_choice('general.currencies', 1)]);
+            $message = trans('messages.success.created', ['type' => trans_choice('general.currencies', 1)]);
 
             flash($message)->success();
         } else {
@@ -122,7 +122,7 @@ class Currencies extends Controller
         }
 
         // Set default currency
-        $currency->default_currency = ($currency->code == setting('default.currency')) ? 1 : 0;
+        $currency->default_currency = ($currency->code == default_currency()) ? 1 : 0;
 
         $precisions = (object) [
             '0' => '0',
@@ -232,15 +232,15 @@ class Currencies extends Controller
 
         $code = request('code');
 
-        $currencies = Currency::all()->pluck('rate', 'code');
-
         if ($code) {
-            $currency = config('money.' . $code);
+            $currencies = Currency::all()->pluck('rate', 'code');
 
-            $currency['rate'] = isset($currencies[$code]) ? $currencies[$code] : null;
-            $currency['symbol_first'] = $currency['symbol_first'] ? 1 : 0;
+            $currency = (object) currency($code)->toArray()[$code];
 
-            $json = (object) $currency;
+            $currency->rate = isset($currencies[$code]) ? $currencies[$code] : null;
+            $currency->symbol_first = ! empty($currency->symbol_first) ? 1 : 0;
+
+            $json = $currency;
         }
 
         return response()->json($json);

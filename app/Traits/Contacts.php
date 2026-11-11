@@ -18,6 +18,13 @@ trait Contacts
         return in_array($type, $this->getVendorTypes());
     }
 
+    public function isEmployee()
+    {
+        $type = $this->type ?? $this->contact->type ?? $this->model->type ?? 'employee';
+
+        return in_array($type, $this->getEmployeeTypes());
+    }
+
     public function getCustomerTypes($return = 'array')
     {
         return $this->getContactTypes('customer', $return);
@@ -26,6 +33,11 @@ trait Contacts
     public function getVendorTypes($return = 'array')
     {
         return $this->getContactTypes('vendor', $return);
+    }
+
+    public function getEmployeeTypes($return = 'array')
+    {
+        return $this->getContactTypes('employee', $return);
     }
 
     public function getContactTypes($index, $return = 'array')
@@ -45,6 +57,11 @@ trait Contacts
         $this->addContactType($new_type, 'vendor');
     }
 
+    public function addEmployeeType($new_type)
+    {
+        $this->addContactType($new_type, 'employee');
+    }
+
     public function addContactType($new_type, $index)
     {
         $types = explode(',', setting('contact.type.' . $index));
@@ -58,5 +75,44 @@ trait Contacts
         setting([
             'contact.type.' . $index => implode(',', $types),
         ])->save();
+    }
+
+    public function getFormattedAddress($city = null, $country = null, $state = null, $zip_code = null)
+    {
+        if (is_null($city)
+            && is_null($country)
+            && is_null($state)
+            && is_null($zip_code)
+        ) {
+            return null;
+        }
+
+        $address_format = (string) setting('default.address_format');
+
+        // Keep formatted address as plain text. Views convert line breaks to <br> safely.
+        $address_format = str_ireplace(['<br>', '<br/>', '<br />'], "\n", $address_format);
+
+        $formatted_address = str_replace(
+            ["{city}", "{country}", "{state}", "{zip_code}", "\n"],
+            [$city, $country, $state, $zip_code, "\n"],
+            $address_format
+        );
+
+        // Remove separators left behind by empty fields, e.g. ", {state}" when state is empty.
+        $lines = [];
+
+        foreach (preg_split('/\r\n|\r|\n/', $formatted_address) as $line) {
+            $line = preg_replace('/\s+/u', ' ', $line);
+            $line = preg_replace('/\s*,(\s*,)+/u', ',', $line);
+            $line = trim($line, " ,");
+
+            if ($line === '') {
+                continue;
+            }
+
+            $lines[] = $line;
+        }
+
+        return empty($lines) ? null : implode("\n", $lines);
     }
 }

@@ -10,7 +10,7 @@ use App\Events\Report\RowsShowing;
 class AddExpenseCategories extends Listener
 {
     protected $classes = [
-        'App\Reports\ExpenseSummary',
+        \App\Reports\ExpenseSummary::class,
     ];
 
     /**
@@ -26,8 +26,15 @@ class AddExpenseCategories extends Listener
         }
 
         // send true for add limit on search and filter..
-        $event->class->filters['categories'] = $this->getExpenseCategories(true);
-        $event->class->filters['routes']['categories'] = ['categories.index', 'search=type:expense enabled:1'];
+        $event->class->filters['categories'] = $this->getExpenseCategories(limit: true);
+        $event->class->filters['routes']['categories'] = ['categories.index', 'search=type:' . $this->getExpenseCategoryTypes('string') . ' enabled:1'];
+        $event->class->filters['multiple']['categories'] = true;
+        $event->class->filters['operators']['categories'] = [
+            'equal'     => true,
+            'not_equal' => true,
+            'multiple'  => true,
+            'range'     => false,
+        ];
     }
 
     /**
@@ -57,18 +64,14 @@ class AddExpenseCategories extends Listener
             return;
         }
 
-        $all_categories = $this->getExpenseCategories();
-
-        if ($category_ids = $this->getSearchStringValue('category_id')) {
-            $categories = explode(',', $category_ids);
-
-            $rows = collect($all_categories)->filter(function ($value, $key) use ($categories) {
-                return in_array($key, $categories);
-            });
-        } else {
-            $rows = $all_categories;
-        }
+        $rows = $this->filterRowsBySearchString($this->getExpenseCategories(), 'category_id');
 
         $this->setRowNamesAndValues($event, $rows);
+
+        $event->class->row_tree_nodes = [];
+
+        $nodes = $this->getCategoriesNodes($rows);
+
+        $this->setTreeNodes($event, $nodes);
     }
 }

@@ -10,6 +10,12 @@ use App\Models\Setting\Category;
 
 class AddIncomeExpenseCategories extends Listener
 {
+    protected $classes = [
+        \App\Reports\DiscountSummary::class,
+        \App\Reports\IncomeExpenseSummary::class,
+        \App\Reports\ProfitLoss::class,
+    ];
+
     /**
      * Handle filter showing event.
      *
@@ -18,16 +24,21 @@ class AddIncomeExpenseCategories extends Listener
      */
     public function handleFilterShowing(FilterShowing $event)
     {
-        $classes = [
-            'App\Reports\IncomeExpenseSummary',
-        ];
-
-        if (empty($event->class) || !in_array(get_class($event->class), $classes)) {
+        if ($this->skipThisClass($event)) {
             return;
         }
 
-        $event->class->filters['categories'] = $this->getIncomeExpenseCategories(true);
-        $event->class->filters['routes']['categories'] = ['categories.index', 'search=type:income,expense enabled:1'];
+        $types = array_merge($this->getIncomeCategoryTypes(), $this->getExpenseAndDirectCostCategoryTypes());
+
+        $event->class->filters['categories'] = $this->getIncomeExpenseCategories(limit: true);
+        $event->class->filters['routes']['categories'] = ['categories.index', 'search=type:' . implode(',', $types) . ' enabled:1'];
+        $event->class->filters['multiple']['categories'] = true;
+        $event->class->filters['operators']['categories'] = [
+            'equal'     => true,
+            'not_equal' => true,
+            'multiple'  => true,
+            'range'     => false,
+        ];
     }
 
     /**
@@ -38,12 +49,7 @@ class AddIncomeExpenseCategories extends Listener
      */
     public function handleGroupShowing(GroupShowing $event)
     {
-        $classes = [
-            'App\Reports\IncomeExpenseSummary',
-            'App\Reports\ProfitLoss',
-        ];
-
-        if (empty($event->class) || !in_array(get_class($event->class), $classes)) {
+        if ($this->skipThisClass($event)) {
             return;
         }
 
@@ -58,56 +64,65 @@ class AddIncomeExpenseCategories extends Listener
      */
     public function handleRowsShowing(RowsShowing $event)
     {
-        if (
-            empty($event->class)
-            || empty($event->class->model->settings->group)
-            || ($event->class->model->settings->group != 'category')
-        ) {
+        if ($this->skipRowsShowing($event, 'category')) {
             return;
         }
 
-        switch (get_class($event->class)) {
-            case 'App\Reports\ProfitLoss':
-                $categories = Category::type(['income', 'expense'])->orderBy('name')->get();
-                $rows = $categories->pluck('name', 'id')->toArray();
+        $types = array_merge($this->getIncomeCategoryTypes(), $this->getExpenseAndDirectCostCategoryTypes());
+        $categories = Category::type($types)->orderBy('name')->get();
+        $rows = $this->filterRowsBySearchString($categories->pluck('name', 'id')->toArray(), 'category_id');
 
-                $this->setRowNamesAndValuesForProfitLoss($event, $rows, $categories);
+        $this->setRowNamesAndValuesForCategories($event, $rows, $categories);
 
-                break;
-            case 'App\Reports\IncomeExpenseSummary':
-                $all_categories = $this->getIncomeExpenseCategories();
+        $nodes = $this->getCategoriesNodes($rows);
 
-                if ($category_ids = $this->getSearchStringValue('category_id')) {
-                    $categories = explode(',', $category_ids);
-
-                    $rows = collect($all_categories)->filter(function ($value, $key) use ($categories) {
-                        return in_array($key, $categories);
-                    });
-                } else {
-                    $rows = $all_categories;
-                }
-
-                $this->setRowNamesAndValues($event, $rows);
-
-                break;
-        }
+        $this->setTreeNodesForCategories($event, $nodes, $categories);
     }
 
-    public function setRowNamesAndValuesForProfitLoss($event, $rows, $categories)
+    public function setRowNamesAndValuesForCategories($event, $rows, $categories)
     {
         foreach ($event->class->dates as $date) {
-            foreach ($event->class->tables as $type_id => $type_name) {
+            foreach ($event->class->tables as $table_key => $table_name) {
+                $table_keys = $this->getCategoryTypesForTable($table_key);
+
                 foreach ($rows as $id => $name) {
                     $category = $categories->where('id', $id)->first();
 
-                    if ($category->type != $type_id) {
+                    if (! in_array($category->type, $table_keys)) {
                         continue;
                     }
 
-                    $event->class->row_names[$type_name][$id] = $name;
-                    $event->class->row_values[$type_name][$id][$date] = 0;
+                    $event->class->row_names[$table_key][$id] = $name;
+                    $event->class->row_values[$table_key][$id][$date] = 0;
                 }
             }
         }
+    }
+
+    public function setTreeNodesForCategories($event, $nodes, $categories)
+    {
+        foreach ($event->class->tables as $table_key => $table_name) {
+            $table_keys = $this->getCategoryTypesForTable($table_key);
+
+            foreach ($nodes as $id => $node) {
+                $category = $categories->where('id', $id)->first();
+
+                if (! in_array($category->type, $table_keys)) {
+                    continue;
+                }
+
+                $event->class->row_tree_nodes[$table_key][$id] = $node;
+            }
+        }
+    }
+
+    protected function getCategoryTypesForTable(string $table_key): array
+    {
+        return match ($table_key) {
+            Category::INCOME_TYPE => $this->getIncomeCategoryTypes(),
+            Category::EXPENSE_TYPE => $this->getExpenseCategoryTypes(),
+            Category::DIRECT_COST_TYPE => $this->getDirectCostCategoryTypes(),
+            default => $this->getExpenseCategoryTypes(),
+        };
     }
 }

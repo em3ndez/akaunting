@@ -24,13 +24,30 @@ class Categories extends Controller
      */
     public function index()
     {
-        $categories = Category::collect();
+        $query = Category::with('sub_categories');
 
-        $transfer_id = Category::transfer();
+        if (search_string_value('searchable')) {
+            $query->withSubCategory();
+        }
 
         $types = $this->getCategoryTypes();
 
-        return $this->response('settings.categories.index', compact('categories', 'types', 'transfer_id'));
+        if (request()->get('list_records') == 'all') {
+            $query->type(array_keys($types));
+        }
+
+        $categories = $query->collect();
+
+        $search_string_type = search_string_value('type');
+
+        $filtered_types = is_array($search_string_type) ? $search_string_type : explode(',', $search_string_type);
+
+        $selected_types = ! empty($search_string_type) ? array_intersect($filtered_types, array_keys($types)) : array_keys($types);
+
+        // Hide the column only when the code is hidden for all of the listed types
+        $hide_code_column = ! in_array(false, $this->hideCodeCategoryTypes($selected_types), true);
+
+        return $this->response('settings.categories.index', compact('categories', 'types', 'hide_code_column'));
     }
 
     /**
@@ -50,9 +67,26 @@ class Categories extends Controller
      */
     public function create()
     {
-        $types = $this->getCategoryTypes();
+        $categories = [];
 
-        return view('settings.categories.create', compact('types'));
+        foreach (config('type.category') as $type => $config) {
+            $categories[$type] = [];
+        }
+
+        $type_group = $this->isGroupCategoryType();
+        $hide_code_types = $this->hideCodeCategoryTypes(array_keys($categories));
+
+        $types = $this->getCategoryTypes(group: $type_group);
+
+        Category::enabled()->orderBy('name')->get()->each(function ($category) use (&$categories) {
+            $categories[$category->type][] = [
+                'id' => $category->id,
+                'title' => $category->name,
+                'level' => $category->level,
+            ];
+        });
+
+        return view('settings.categories.create', compact('types', 'categories', 'type_group', 'hide_code_types'));
     }
 
     /**
@@ -69,7 +103,7 @@ class Categories extends Controller
         if ($response['success']) {
             $response['redirect'] = route('categories.index');
 
-            $message = trans('messages.success.added', ['type' => trans_choice('general.categories', 1)]);
+            $message = trans('messages.success.created', ['type' => trans_choice('general.categories', 1)]);
 
             flash($message)->success();
         } else {
@@ -116,11 +150,52 @@ class Categories extends Controller
      */
     public function edit(Category $category)
     {
-        $types = $this->getCategoryTypes();
-
         $type_disabled = (Category::where('type', $category->type)->count() == 1) ?: false;
+        $type_locked = $category->isTypeLocked();
 
-        return view('settings.categories.edit', compact('category', 'types', 'type_disabled'));
+        $edited_category_id = $category->id;
+
+        $categories = [];
+
+        foreach (config('type.category') as $type => $config) {
+            $categories[$type] = [];
+        }
+
+        $type_group = $this->isGroupCategoryType();
+        $hide_code_types = $this->hideCodeCategoryTypes(array_keys($categories));
+
+        $types = $this->getCategoryTypes(group: $type_group);
+
+        $skip_categories = [];
+        $skip_categories[] = $edited_category_id;
+
+        foreach ($category->sub_categories as $sub_category) {
+            $skip_categories[] = $sub_category->id;
+
+            if ($sub_category->sub_categories) {
+                $skips = $this->getChildrenCategoryIds($sub_category);
+
+                foreach ($skips as $skip) {
+                    $skip_categories[] = $skip;
+                }
+            }
+        }
+
+        Category::enabled()->orderBy('name')->get()->each(function ($category) use (&$categories, &$skip_categories) {
+            if (in_array($category->id, $skip_categories)) {
+                return;
+            }
+
+            $categories[$category->type][] = [
+                'id' => $category->id,
+                'title' => $category->name,
+                'level' => $category->level,
+            ];
+        });
+
+        $parent_categories = $categories[$category->type] ?? [];
+
+        return view('settings.categories.edit', compact('category', 'types', 'type_disabled', 'type_locked', 'categories', 'parent_categories', 'type_group', 'hide_code_types'));
     }
 
     /**

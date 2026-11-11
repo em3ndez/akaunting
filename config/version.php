@@ -4,22 +4,23 @@ return [
 
     'name'      =>  'Akaunting',
 
-    'code'      =>  'Document',
+    'code'      =>  'Speed',
 
-    'major'     =>  '2',
+    'major'     =>  '3',
 
-    'minor'     =>  '1',
+    'minor'     =>  '3',
 
-    'patch'     =>  '35',
+    'patch'     =>  '1',
 
     'build'     =>  '',
 
     'status'    =>  'Stable',
 
-    'date'      =>  '27-April-2021',
+    'date'      =>  '11-November-2026',
 
-    'time'      =>  '14:00',
+    'time'      =>  '15:00',
 
     'zone'      =>  'GMT +3',
+
 
 ];

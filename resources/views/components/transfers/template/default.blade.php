@@ -1,179 +1,273 @@
-@if (!$hideFromAccount)
-    <table class="border-bottom-1" style="width: 100%;">
+<div class="print-template">
+    @stack('from_account_start')
+    <table class="border-bottom-1">
         <tbody>
+            @stack('from_account_id_input_start')
             <tr>
-                <td style="width: 60%; padding-bottom: 15px;">
-                    @if (!$hideFromAccountTitle)
-                        <h2 class="mb-1" style="font-size: 16px;">
-                            {{ trans($textFromAccountTitle) }}
-                        </h2>
+                <td style="width: 60%; padding: 0 0 15px 0;">
+                    <div class="mb-1 font-semibold" style="font-size: 14px; margin-bottom: 15px;">
+                        {{ trans('transfers.from_account') }}
+                    </div>
+
+                    <table>
+                        @stack('from_account_name_input_start')
+                        <tr>
+                            <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                                {{ trans('accounts.account_name') }}
+                            </td>
+
+                            <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                                {{ $transfer->expense_account->name }}
+                            </td>
+                        </tr>
+                        @stack('from_account_name_input_end')
+                    </table>
+
+                    <table>
+                        @stack('from_account_number_input_start')
+                        <tr>
+                            <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                                {{ trans('accounts.number') }}
+                            </td>
+
+                            <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                                {{ $transfer->expense_account->number }}
+                            </td>
+                        </tr>
+                        @stack('from_account_number_input_end')
+                    </table>
+
+                    @if (! empty($transfer->expense_account->bank_name))
+                    <table>
+                        @stack('from_account_bank_name_input_start')
+                        <tr>
+                            <td valign="top" class="font-semibold"  style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                                {{ trans('accounts.bank_name') }}
+                            </td>
+
+                            <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                                {{ $transfer->expense_account->bank_name }}
+                            </td>
+                        </tr>
+                        @stack('from_account_bank_name_input_end')
+                    </table>
                     @endif
 
-                    @if (!$hideFromAccountName)
-                        <p style="margin: 0px; padding: 0px; font-size: 14px;">
-                            {{ $transfer->expense_transaction->account->name }}
-                        </p>
+                    @if (! empty($transfer->expense_account->bank_phone))
+                    <table>
+                        @stack('from_account_phone_input_start')
+                        <tr>
+                            <td valign="top" class="font-semibold"  style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                                {{ trans('general.phone') }}
+                            </td>
+
+                            <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                                {{ $transfer->expense_account->bank_phone }}
+                            </td>
+                        </tr>
+                        @stack('from_account_phone_input_end')
+                    </table>
                     @endif
 
-                    @if (!$hideFromAccountNumber)
-                        <p style="margin: 0px; padding: 0px; font-size: 14px;">
-                            {{ trans($textFromAccountNumber) }}: {{ $transfer->expense_transaction->account->number }}
-                        </p>
-                    @endif
+                    @if (! empty($transfer->expense_account->bank_address))
+                    <table>
+                        @stack('from_account_address_input_start')
+                        <tr>
+                            <td valign="top" class="font-semibold"  style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                                {{ trans('general.address') }}
+                            </td>
 
-                    @if (!$hideFromAccountBankName)
-                        <p style="margin: 0px; padding: 0px; font-size: 14px;">
-                            {{ $transfer->expense_transaction->account->bank_name }}
-                        </p>
-                    @endif
-
-                    @if (!$hideFromAccountBankPhone)
-                        <p style="margin: 0px; padding: 0px; font-size: 14px;">
-                            {{ $transfer->expense_transaction->account->bank_phone }}
-                        </p>
-                    @endif
-
-                    @if (!$hideFromAccountBankAddress)
-                        <p style="margin: 0px; padding: 0px; font-size: 14px;">
-                            {{ $transfer->expense_transaction->account->bank_address }}
-                        </p>
+                            <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                                {{ $transfer->expense_account->bank_address }}
+                            </td>
+                        </tr>
+                        @stack('from_account_address_input_end')
+                    </table>
                     @endif
                 </td>
             </tr>
+            @stack('from_account_id_input_end')
         </tbody>
     </table>
-@endif
+    @stack('from_account_end')
 
-@if (!$hideToAccount)
-    <table class="border-bottom-1" style="width: 100%; margin-top:15px;">
+    @stack('to_account_start')
+    <table class="border-bottom-1" style="margin-top:15px;">
         <tbody>
+            @stack('to_account_id_input_start')
             <tr>
-                <td style="width: 60%; padding-bottom: 15px;">
-                    @if (!$hideToAccountTitle)
-                        <h2 class="mb-1" style="font-size: 16px;">
-                            {{ trans($textToAccountTitle) }}
-                        </h2>
+                <td style="width: 60%; padding: 0 0 15px 0;">
+                    <div class="mb-1 font-semibold" style="font-size: 14px; margin-bottom: 15px;">
+                        {{ trans('transfers.to_account') }}
+                    </div>
+
+                    <table>
+                        @stack('to_account_name_input_start')
+                        <tr>
+                            <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                                {{ trans('accounts.account_name') }}
+                            </td>
+
+                            <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                                {{ $transfer->income_account->name }}
+                            </td>
+                        </tr>
+                        @stack('to_account_name_input_end')
+                    </table>
+
+                    <table>
+                        @stack('to_account_number_input_start')
+                        <tr>
+                            <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                                {{ trans('accounts.number') }}
+                            </td>
+
+                            <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                                {{ $transfer->income_account->number }}
+                            </td>
+                        </tr>
+                        @stack('to_account_number_input_end')
+                    </table>
+
+                    @if (! empty($transfer->income_account->bank_name))
+                    <table>
+                        @stack('to_account_bank_name_input_start')
+                        <tr>
+                            <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                                {{ trans('accounts.bank_name') }}
+                            </td>
+
+                            <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                                {{ $transfer->income_account->bank_name }}
+                            </td>
+                        </tr>
+                        @stack('to_account_bank_name_input_end')
+                    </table>
                     @endif
 
-                    @if (!$hideToAccountName)
-                        <p style="margin: 0px; padding: 0px; font-size: 14px;">
-                            {{ $transfer->income_transaction->account->name }}
-                        </p>
+                    @if (! empty($transfer->income_account->bank_phone))
+                    <table>
+                        @stack('to_account_phone_input_start')
+                        <tr>
+                            <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                                {{ trans('general.phone') }}
+                            </td>
+
+                            <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                                {{ $transfer->income_account->bank_phone }}
+                            </td>
+                        </tr>
+                        @stack('to_account_phone_input_end')
+                    </table>
                     @endif
 
-                    @if (!$hideToAccountNumber)
-                        <p style="margin: 0px; padding: 0px; font-size: 14px;">
-                            {{ trans($textToAccountNumber) }}: {{ $transfer->income_transaction->account->number }}
-                        </p>
-                    @endif
+                    @if (! empty($transfer->income_account->bank_address))
+                    <table>
+                        @stack('to_account_address_input_start')
+                        <tr>
+                            <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                                {{ trans('general.address') }}
+                            </td>
 
-                    @if (!$hideToAccountBankName)
-                        <p style="margin: 0px; padding: 0px; font-size: 14px;">
-                            {{ $transfer->income_transaction->account->bank_name }}
-                        </p>
-                    @endif
-
-                    @if (!$hideToAccountBankPhone)
-                        <p style="margin: 0px; padding: 0px; font-size: 14px;">
-                            {{ $transfer->income_transaction->account->bank_phone }}
-                        </p>
-                    @endif
-
-                    @if (!$hideToAccountBankAddress)
-                        <p style="margin: 0px; padding: 0px; font-size: 14px;">
-                            {{ $transfer->income_transaction->account->bank_address }}
-                        </p>
+                            <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                                {{ $transfer->income_account->bank_address }}
+                            </td>
+                        </tr>
+                        @stack('to_account_address_input_end')
+                    </table>
                     @endif
                 </td>
             </tr>
+            @stack('to_account_id_input_end')
         </tbody>
     </table>
-@endif
+    @stack('to_account_end')
 
-@if (!$hideDetails)
-    @if (!$hideDetailTitle)
-        <table>
-            <tr>
-                <td style="padding-bottom: 0; padding-top: 32px;">
-                    <h2 class="text-center text-uppercase" style="font-size: 16px;">
-                        {{ trans_choice($textDetailTitle, 2) }}
-                    </h2>
-                </td>
-            </tr>
-        </table>
-    @endif
-
-    <table>
+    @stack('details_start')
+    <table style="margin-top:15px;">
         <tr>
-            <td style="width: 70%; padding-top:0; padding-bottom:0;">
-                <table>
-                    @if (!$hideDetailDate)
-                        <tr>
-                            <td style="width: 20%; padding-bottom:3px; font-size:14px; font-weight: bold;">
-                                {{ trans($textDetailDate) }}:
-                            </td>
+            <td style="padding:0 0 15px 0;">
+                <div class="ltr:text-left rtl:text-right font-semibold" style="font-size: 14px;">
+                    {{ trans_choice('transfers.details', 2) }}
+                </div>
+            </td>
+        </tr>
+    </table>
 
-                            <td class="border-bottom-1" style="width:80%; padding-bottom:3px; font-size:14px;">
-                                @date($transfer->expense_transaction->paid_at)
-                            </td>
-                        </tr>
-                    @endif
-
-                    @if (!$hideDetailPaymentMethod)
-                        <tr>
-                            <td style="width: 20%; padding-bottom:3px; font-size:14px; font-weight: bold;">
-                                {{ trans_choice($textDetailPaymentMethod, 1) }}:
-                            </td>
-
-                            <td class="border-bottom-1" style="width:80%; padding-bottom:3px; font-size:14px;">
-                                {{ !empty($payment_methods[$transfer->expense_transaction->payment_method]) ? $payment_methods[$transfer->expense_transaction->payment_method] : trans('general.na') }}
-                            </td>
-                        </tr>
-                    @endif
-
-                    @if (!$hideDetailReference)
-                        <tr>
-                            <td style="width: 20%; padding-bottom:3px; font-size:14px; font-weight: bold;">
-                                {{ trans($textDetailReference) }}:
-                            </td>
-
-                            <td class="border-bottom-1" style="width:80%; padding-bottom:3px; font-size:14px;">
-                                {{ $transfer->expense_transaction->reference }}
-                            </td>
-                        </tr>
-                    @endif
-
-                    @if (!$hideDetailDescription)
-                        <tr>
-                            <td style="width: 20%; padding-bottom:3px; font-size:14px; font-weight: bold;">
-                                {{ trans($textDetailDescription) }}
-                            </td>
-
-                            <td class="border-bottom-1" style="width:80%; padding-bottom:3px; font-size:14px;">
-                                {{ $transfer->expense_transaction->description }}
-                            </td>
-                        </tr>
-                    @endif
-                </table>
+    <table class="border-bottom-1" style="padding-bottom:15px;">
+        @stack('transferred_at_input_start')
+        <tr>
+            <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                {{ trans('general.date') }}
             </td>
 
-            @if (!$hideDetailAmount)
-                <td style="width:30%; padding-top:32px; padding-left: 25px;" valign="top">
-                    <table>
-                        <tr>
-                            <td style="background-color: #6da252; -webkit-print-color-adjust: exact; font-weight:bold !important; display:block;">
-                                <h5 class="text-muted mb-0 text-white" style="font-size: 20px; color:#ffffff; text-align:center; margin-top: 16px;">
-                                    {{ trans($textDetailAmount) }}:
-                                </h5>
+            <td valign="top" valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                <x-date date="{{ $transfer->expense_transaction->paid_at}}" />
+            </td>
+        </tr>
+        @stack('transferred_at_input_end')
 
-                                <p class="font-weight-bold mb-0 text-white" style="font-size: 26px; color:#ffffff; text-align:center;">
-                                    @money($transfer->expense_transaction->amount, $transfer->expense_transaction->currency_code, true)
-                                </p>
-                            </td>
-                        </tr>
-                    </table>
-                </td>
+        @stack('payment_method_input_start')
+        <tr>
+            <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                {{ trans_choice('general.payment_methods', 1) }}
+            </td>
+
+            <td valign="top" valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                <x-payment-method :method="$transfer->expense_transaction->payment_method" />
+            </td>
+        </tr>
+        @stack('payment_method_input_end')
+
+        @stack('reference_input_start')
+        <tr>
+            <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                {{ trans('general.reference') }}
+            </td>
+
+            <td valign="top" valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                {{ $transfer->expense_transaction->reference }}
+            </td>
+        </tr>
+        @stack('reference_input_end')
+
+        @stack('description_input_start')
+        <tr>
+            <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                {{ trans('general.description') }}
+            </td>
+
+            <td valign="top" valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                {{ $transfer->expense_transaction->description }}
+            </td>
+        </tr>
+        @stack('description_input_end')
+
+        @stack('amount_input_start')
+        {{-- The reason for adding the amount part here is because the amount style is broken in the view. --}}
+        @stack('amount_input_end')
+
+        <tr>
+            <td></td>
+        </tr>
+    </table>
+    @stack('details_end')
+
+
+    <table style="width:100%; text-align: {{ language()->direction() === 'rtl' ? 'left' : 'right' }}; margin-top:55px;">
+        <tr>
+            @if (language()->direction() !== 'rtl')
+            <td style="width:20%;"></td>
+            @endif
+            <td valign="center" style="width:80%; font-size: 14px; background-color: #55588B; -webkit-print-color-adjust: exact; color:#ffffff; border-radius: 5px;">
+                <span class="ltr:mr-2 rtl:ml-2 font-semibold" style="color:#ffffff;">
+                    {{ trans('general.amount') }}
+                </span>
+                <x-money :amount="$transfer->expense_transaction->amount" :currency="$transfer->expense_transaction->currency_code" />
+            </td>
+            @if (language()->direction() === 'rtl')
+            <td style="width:20%;"></td>
             @endif
         </tr>
     </table>
-@endif
+</div>

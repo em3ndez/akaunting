@@ -3,6 +3,9 @@
 namespace App\Jobs\Setting;
 
 use App\Abstracts\Job;
+use App\Events\Setting\CurrencyUpdated;
+use App\Events\Setting\CurrencyUpdating;
+use App\Exceptions\Job\NotAllowed;
 use App\Interfaces\Job\ShouldUpdate;
 use App\Models\Setting\Currency;
 
@@ -11,6 +14,8 @@ class UpdateCurrency extends Job implements ShouldUpdate
     public function handle(): Currency
     {
         $this->authorize();
+
+        event(new CurrencyUpdating($this->model, $this->request));
 
         // Force the rate to be 1 for default currency
         if ($this->request->get('default_currency')) {
@@ -27,6 +32,8 @@ class UpdateCurrency extends Job implements ShouldUpdate
             }
         });
 
+        event(new CurrencyUpdated($this->model, $this->request));
+
         return $this->model;
     }
 
@@ -42,13 +49,13 @@ class UpdateCurrency extends Job implements ShouldUpdate
         if ($this->model->code != $this->request->get('code')) {
             $message = trans('messages.warning.disable_code', ['name' => $this->model->name, 'text' => implode(', ', $relationships)]);
 
-            throw new \Exception($message);
+            throw new NotAllowed($message);
         }
 
-        if (! $this->request->get('enabled')) {
+        if ($this->request->has('enabled') && ! $this->request->get('enabled')) {
             $message = trans('messages.warning.disable_code', ['name' => $this->model->name, 'text' => implode(', ', $relationships)]);
 
-            throw new \Exception($message);
+            throw new NotAllowed($message);
         }
     }
 
@@ -57,6 +64,7 @@ class UpdateCurrency extends Job implements ShouldUpdate
         $rels = [
             'accounts' => 'accounts',
             'customers' => 'customers',
+            'vendors' => 'vendors',
             'invoices' => 'invoices',
             'bills' => 'bills',
             'transactions' => 'transactions',
@@ -64,7 +72,7 @@ class UpdateCurrency extends Job implements ShouldUpdate
 
         $relationships = $this->countRelationships($this->model, $rels);
 
-        if ($this->model->code == setting('default.currency')) {
+        if ($this->model->code == default_currency()) {
             $relationships[] = strtolower(trans_choice('general.companies', 1));
         }
 

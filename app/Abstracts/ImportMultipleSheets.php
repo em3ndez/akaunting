@@ -5,9 +5,10 @@ namespace App\Abstracts;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Maatwebsite\Excel\Concerns\Importable;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
+use Maatwebsite\Excel\Concerns\SkipsUnknownSheets;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
-abstract class ImportMultipleSheets implements ShouldQueue, WithChunkReading, WithMultipleSheets
+abstract class ImportMultipleSheets implements ShouldQueue, WithChunkReading, WithMultipleSheets, SkipsUnknownSheets
 {
     use Importable;
 
@@ -20,6 +21,11 @@ abstract class ImportMultipleSheets implements ShouldQueue, WithChunkReading, Wi
 
     public function chunkSize(): int
     {
-        return 100;
+        return config('excel.imports.chunk_size');
+    }
+    
+    public function onUnknownSheet($sheetName)
+    {
+        //
     }
 }

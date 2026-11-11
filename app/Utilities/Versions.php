@@ -2,15 +2,19 @@
 
 namespace App\Utilities;
 
+use App\Models\Module\Module;
 use App\Traits\SiteApi;
-use Cache;
-use Date;
+use App\Traits\Jobs;
+use App\Jobs\Install\DisableModule;
+use App\Jobs\Install\UninstallModule;
+use App\Utilities\Date;
 use GrahamCampbell\Markdown\Facades\Markdown;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 
 class Versions
 {
-    use SiteApi;
+    use SiteApi, Jobs;
 
     public static function changelog()
     {
@@ -18,7 +22,7 @@ class Versions
 
         $url = 'https://api.github.com/repos/akaunting/akaunting/releases';
 
-        $http = new \GuzzleHttp\Client(['verify' => false]);
+        $http = new \GuzzleHttp\Client(['verify' => \Composer\CaBundle\CaBundle::getSystemCaRootBundlePath()]);
 
         $json = $http->get($url, ['timeout' => 30])->getBody()->getContents();
 
@@ -41,9 +45,23 @@ class Versions
                 continue;
             }
 
-            $output .= '<h2><span class="badge badge-pill badge-success">' . $release->tag_name . '</span></h2>';
+            if (empty($output)) {
+                $output .= '<div class="mx-6">';
+            } else {
+                $output .= '<div class="mx-6 my-6">';
+            }
 
-            $output .= Markdown::convertToHtml($release->body);
+            $output .= '    <div class="mb-4">';
+            $output .= '        <h2>';
+            $output .= '            <span class="rounded-xl bg-green px-3 py-2 text-base font-medium text-white ring-1 ring-inset ring-green">';
+            $output .=                  $release->tag_name;
+            $output .= '            </span>';
+            $output .= '        </h2>';
+            $output .= '    </div>';
+
+            $output .=      Markdown::convertToHtml($release->body);
+
+            $output .= '</div>';
 
             $output .= '<hr>';
         }
@@ -55,107 +73,216 @@ class Versions
     {
         $versions = static::all($alias);
 
-        if (empty($versions[$alias]) || empty($versions[$alias]->data)) {
-            return false;
+        if (empty($versions[$alias])) {
+            return static::getVersionByAlias($alias);
         }
 
-        return $versions[$alias]->data->latest;
+        return $versions[$alias];
     }
 
     public static function all($modules = null)
     {
-        // Get data from cache
-        $versions = Cache::get('versions');
+        return Cache::remember('versions', Date::now()->addHours(6), function () use ($modules) {
+            $info = Info::all();
 
-        if (!empty($versions)) {
+            $versions = [];
+
+            // Check core first
+            try {
+                $url = 'core/version/' . $info['akaunting'] . '/' . $info['php'] . '/' . $info['mysql'] . '/' . $info['companies'];
+            } catch (\Exception $e) {
+                // Handle exception
+                report('Error fetching core version: ( $info = ' . json_encode($info) . ')' . $e->getMessage());
+
+                return $versions;
+            }
+
+            # Installed modules start
+            $modules = Arr::wrap($modules);
+
+            $installed_modules = [];
+            $module_version = '?modules=';
+
+            foreach ($modules as $module) {
+                if (is_string($module)) {
+                    $module = module($module);
+                }
+
+                if (! $module instanceof \Akaunting\Module\Module) {
+                    continue;
+                }
+
+                $alias = $module->get('alias');
+
+                $installed_modules[] = $alias;
+            }
+
+            $module_version .= implode(',', $installed_modules);
+
+            $url .= $module_version;
+            # Installed modules end
+
+            $versions['core'] = static::getLatestVersion($url, $info['akaunting']);
+
+            // Then modules
+            foreach ($modules as $module) {
+                if (is_string($module)) {
+                    $module = module($module);
+                }
+
+                if (! $module instanceof \Akaunting\Module\Module) {
+                    continue;
+                }
+
+                $alias = $module->get('alias');
+                $version = $module->get('version');
+
+                $url = 'apps/' . $alias . '/version/' . $version . '/' . $info['akaunting'];
+
+                $versions[$alias] = static::getLatestVersion($url, $version);
+            }
+
             return $versions;
-        }
+        });
+    }
 
+    public static function getVersionByAlias($alias)
+    {
         $info = Info::all();
-
-        $versions = [];
 
         // Check core first
         $url = 'core/version/' . $info['akaunting'] . '/' . $info['php'] . '/' . $info['mysql'] . '/' . $info['companies'];
+        $version = $info['akaunting'];
 
-        $versions['core'] = static::getLatestVersion($url, $info['akaunting']);
-
-        $modules = Arr::wrap($modules);
-
-        // Then modules
-        foreach ($modules as $module) {
-            if (is_string($module)) {
-                $module = module($module);
-            }
-
-            if (!$module instanceof \Akaunting\Module\Module) {
-                continue;
-            }
-
-            $alias = $module->get('alias');
-            $version = $module->get('version');
+        if ($alias != 'core') {
+            $version = module($alias) ? module($alias)->get('version') : '1.0.0';
 
             $url = 'apps/' . $alias . '/version/' . $version . '/' . $info['akaunting'];
-
-            $versions[$alias] = static::getLatestVersion($url, $version);
         }
 
-        Cache::put('versions', $versions, Date::now()->addHour(6));
+        // Get data from cache
+        $versions = Cache::get('versions', []);
 
-        return $versions;
+        $versions[$alias] = static::getLatestVersion($url, $version);
+
+        Cache::put('versions', $versions, Date::now()->addHours(6));
+
+        return $versions[$alias];
     }
 
     public static function getLatestVersion($url, $latest)
     {
-        if (!$data = static::getResponseData('GET', $url, ['timeout' => 10])) {
-            return $latest;
+        $version = new \stdClass();
+
+        $version->can_update = true;
+        $version->latest = $latest;
+        $version->errors = false;
+        $version->message = '';
+        $version->subscription = null;
+
+        if (! $body = static::getResponseBody('GET', $url, ['timeout' => 10])) {
+            return $version;
         }
 
-        if (!is_object($data)) {
-            return $latest;
+        if (! is_object($body)) {
+            return $version;
         }
 
-        return $data->latest;
+        $version->can_update = $body->success;
+        $version->latest = $body->data->latest;
+        $version->errors = $body->errors;
+        $version->message = $body->message;
+        $version->subscription = $body->data?->subscription ?? null;
+
+        return $version;
+    }
+
+    public static function enforceSubscriptionStatus($alias, $version): void
+    {
+        if (! $version->subscription) {
+            return;
+        }
+
+        // A protected app stays in place whatever its subscription says, so there is
+        // nothing to enforce and the disable/uninstall jobs would only throw.
+        // if (in_array($alias, (array) config('module.protected', []))) {
+        //     return;
+        // }
+
+        if ($version->subscription->expired_at > Date::now()->startOfDay()) {
+            return;
+        }
+
+        $status = 'active';
+
+        switch ($version->subscription->status) {
+            case 'expired':
+            case 'canceled':
+                $status = 'disabled';
+                break;
+            case 'chargeback':
+            case 'not_paid':
+            case 'none':
+            case 'refund':
+                $status = 'uninstalled';
+                break;
+            default:
+                // Do nothing
+                break;
+        }
+
+        if ($status == 'active') {
+            return;
+        }
+
+        $module_companies = Module::allCompanies()->alias($alias)->get();
+
+        foreach ($module_companies as $module) {
+            switch ($status) {
+                case 'disabled':
+                    dispatch(new DisableModule($alias, $module->company_id));
+                    break;
+                case 'uninstalled':
+                    dispatch(new UninstallModule($alias, $module->company_id));
+                    break;
+                default:
+                    // Do nothing
+                    break;
+            }
+        }
     }
 
     public static function getUpdates()
     {
-        // Get data from cache
-        $updates = Cache::get('updates');
+        return Cache::remember('updates', Date::now()->addHours(6), function () {
+            $updates = [];
 
-        if (!empty($updates)) {
-            return $updates;
-        }
+            $modules = module()->all();
 
-        $updates = [];
+            $versions = static::all($modules);
 
-        $modules = module()->all();
+            foreach ($versions as $alias => $latest_version) {
+                if ($alias == 'core') {
+                    $installed_version = version('short');
+                } else {
+                    $module = module($alias);
 
-        $versions = static::all($modules);
+                    if (! $module instanceof \Akaunting\Module\Module) {
+                        continue;
+                    }
 
-        foreach ($versions as $alias => $latest_version) {
-            if ($alias == 'core') {
-                $installed_version = version('short');
-            } else {
-                $module = module($alias);
+                    $installed_version = $module->get('version');
+                }
 
-                if (!$module instanceof \Akaunting\Module\Module) {
+                if (version_compare($installed_version, $latest_version->latest, '>=')) {
                     continue;
                 }
 
-                $installed_version = $module->get('version');
+                $updates[$alias] = $latest_version;
             }
 
-            if (version_compare($installed_version, $latest_version, '>=')) {
-                continue;
-            }
-
-            $updates[$alias] = $latest_version;
-        }
-
-        Cache::put('updates', $updates, Date::now()->addHour(6));
-
-        return $updates;
+            return $updates;
+        });
     }
 
     public static function shouldUpdate($listener_version, $old_version, $new_version): bool

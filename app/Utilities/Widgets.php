@@ -3,46 +3,56 @@
 namespace App\Utilities;
 
 use App\Models\Common\Widget;
+use App\Events\Widget\ClassesCreated as WidgetClassesCreated;
 use App\Models\Module\Module;
+use App\Traits\Modules;
 use Illuminate\Support\Str;
 
 class Widgets
 {
+    use Modules;
+
+    public static $core_widgets = [
+        'App\Widgets\Receivables',
+        'App\Widgets\Payables',
+        'App\Widgets\CashFlow',
+        'App\Widgets\ProfitLoss',
+        'App\Widgets\ExpensesByCategory',
+        'App\Widgets\AccountBalance',
+        'App\Widgets\Currencies',
+    ];
+
     public static function getClasses($alias = 'core', $check_permission = true)
     {
         $classes = $list = [];
 
         if (in_array($alias, ['core', 'all'])) {
-            $list = [
-                'App\Widgets\TotalIncome',
-                'App\Widgets\TotalExpenses',
-                'App\Widgets\TotalProfit',
-                'App\Widgets\CashFlow',
-                'App\Widgets\IncomeByCategory',
-                'App\Widgets\ExpensesByCategory',
-                'App\Widgets\AccountBalance',
-                'App\Widgets\LatestIncome',
-                'App\Widgets\LatestExpenses',
-                'App\Widgets\Currencies',
-            ];
+            $list = static::$core_widgets;
         }
 
         Module::enabled()->each(function ($module) use (&$list, $alias) {
-            if (!in_array($alias, [$module->alias, 'all'])) {
+            if (! in_array($alias, [$module->alias, 'all'])) {
                 return;
             }
 
             $m = module($module->alias);
 
-            if (!$m || empty($m->get('widgets'))) {
+            if (! $m || $m->disabled() || empty($m->get('widgets'))) {
                 return;
             }
 
             $list = array_merge($list, (array) $m->get('widgets'));
         });
 
+        // Added New Event
+        $widget_classes = collect($list);
+
+        event(new WidgetClassesCreated($widget_classes));
+
+        $list = $widget_classes->all();
+
         foreach ($list as $class) {
-            if (!class_exists($class) || ($check_permission && !static::canRead($class))) {
+            if (! class_exists($class) || ($check_permission && ! static::canRead($class))) {
                 continue;
             }
 
@@ -57,13 +67,17 @@ class Widgets
         if (is_string($model)) {
             $class_name = $model;
 
-            if (!class_exists($class_name)) {
+            if (! class_exists($class_name)) {
                 return false;
             }
 
             $model = Widget::where('dashboard_id', session('dashboard_id'))->where('class', $class_name)->first();
 
-            if (!$model instanceof Widget) {
+            if (! empty($model) && ($model->alias != 'core') && (new static)->moduleIsDisabled($model->alias)) {
+                return false;
+            }
+
+            if (! $model instanceof Widget) {
                 $class = (new $class_name());
 
                 $model = new Widget();
@@ -76,7 +90,11 @@ class Widgets
                 $model->settings = $class->getDefaultSettings();
             }
         } else {
-            if ((!$model instanceof Widget) || !class_exists($model->class)) {
+            if ((! $model instanceof Widget) || ! class_exists($model->class)) {
+                return false;
+            }
+
+            if (($model->alias != 'core') && (new static)->moduleIsDisabled($model->alias)) {
                 return false;
             }
 
@@ -88,7 +106,7 @@ class Widgets
 
     public static function show($model, ...$arguments)
     {
-        if (!$class = static::getClassInstance($model)) {
+        if (! $class = static::getClassInstance($model)) {
             return '';
         }
 
@@ -100,9 +118,19 @@ class Widgets
         return (static::isModuleEnabled($class) && static::canRead($class));
     }
 
+    public static function cannotShow($class)
+    {
+        return ! static::canShow($class);
+    }
+
     public static function canRead($class)
     {
         return user()->can(static::getPermission($class));
+    }
+
+    public static function cannotRead($class)
+    {
+        return ! static::canRead($class);
     }
 
     public static function getPermission($class)
@@ -132,15 +160,20 @@ class Widgets
 
     public static function isModuleEnabled($class)
     {
-        if (!$alias = static::getModuleAlias($class)) {
+        if (! $alias = static::getModuleAlias($class)) {
             return true;
         }
 
-        if (Module::alias($alias)->enabled()->first()) {
+        if (module_is_enabled($alias)) {
             return true;
         }
 
         return false;
+    }
+
+    public static function isModuleDisabled($class)
+    {
+        return ! static::isModuleEnabled($class);
     }
 
     public static function isModule($class)
@@ -150,14 +183,40 @@ class Widgets
         return (strtolower($arr[0]) == 'modules');
     }
 
+    public static function isNotModule($class)
+    {
+        return ! static::isModule($class);
+    }
+
     public static function getModuleAlias($class)
     {
-        if (!static::isModule($class)) {
+        if (static::isNotModule($class)) {
             return false;
         }
 
         $arr = is_array($class) ? $class : explode('\\', $class);
 
         return Str::kebab($arr[1]);
+    }
+
+    public static function getCoreWidgets()
+    {
+        return static::$core_widgets;
+    }
+
+    public static function setCoreWidgets($widgets)
+    {
+        static::$core_widgets = $widgets;
+    }
+
+    public static function optimizeCoreWidgets()
+    {
+        $core_widgets = collect(static::getCoreWidgets());
+
+        $core_widgets->pop();
+
+        $core_widgets->push('App\Widgets\BankFeeds');
+
+        static::setCoreWidgets($core_widgets->all());
     }
 }

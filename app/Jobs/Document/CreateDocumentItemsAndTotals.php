@@ -28,9 +28,9 @@ class CreateDocumentItemsAndTotals extends Job implements HasOwner, HasSource, S
 
     public function handle(): void
     {
-        $precision = config('money.' . $this->document->currency_code . '.precision');
+        $precision = currency($this->document->currency_code)->getPrecision();
 
-        list($sub_total, $actual_total, $discount_amount_total, $taxes) = $this->createItems();
+        list($sub_total, $actual_total, $discount_amount_total, $taxes, $inclusive_discount_difference) = $this->createItems();
 
         $sort_order = 1;
 
@@ -47,7 +47,8 @@ class CreateDocumentItemsAndTotals extends Job implements HasOwner, HasSource, S
             'created_by' => $this->request['created_by'],
         ]);
 
-        $this->request['amount'] += $actual_total;
+        // Local total: seeding it from the request doubled the amount and leaked across bulk actions
+        $amount = $actual_total;
 
         $sort_order++;
 
@@ -68,9 +69,11 @@ class CreateDocumentItemsAndTotals extends Job implements HasOwner, HasSource, S
             $sort_order++;
         }
 
-        if (!empty($this->request['discount'])) {
+        if (! empty($this->request['discount'])) {
             if ($this->request['discount_type'] === 'percentage') {
-                $discount_total = ($sub_total - $discount_amount_total) * ($this->request['discount'] / 100);
+                //$discount_total = ($sub_total - $discount_amount_total) * ($this->request['discount'] / 100);
+                $discount_total = $sub_total * ($this->request['discount'] / 100);
+                $discount_total += $inclusive_discount_difference;
             } else {
                 $discount_total = $this->request['discount'];
             }
@@ -91,7 +94,7 @@ class CreateDocumentItemsAndTotals extends Job implements HasOwner, HasSource, S
         }
 
         // Add taxes
-        if (!empty($taxes)) {
+        if (! empty($taxes)) {
             foreach ($taxes as $tax) {
                 DocumentTotal::create([
                     'company_id' => $this->document->company_id,
@@ -105,14 +108,14 @@ class CreateDocumentItemsAndTotals extends Job implements HasOwner, HasSource, S
                     'created_by' => $this->request['created_by'],
                 ]);
 
-                $this->request['amount'] += $tax['amount'];
+                $amount += $tax['amount'];
 
                 $sort_order++;
             }
         }
 
         // Add extra totals, i.e. shipping fee
-        if (!empty($this->request['totals'])) {
+        if (! empty($this->request['totals'])) {
             foreach ($this->request['totals'] as $total) {
                 $total['company_id'] = $this->document->company_id;
                 $total['type'] = $this->document->type;
@@ -130,17 +133,17 @@ class CreateDocumentItemsAndTotals extends Job implements HasOwner, HasSource, S
                 DocumentTotal::create($total);
 
                 if (empty($total['operator']) || ($total['operator'] == 'addition')) {
-                    $this->request['amount'] += $total['amount'];
+                    $amount += $total['amount'];
                 } else {
                     // subtraction
-                    $this->request['amount'] -= $total['amount'];
+                    $amount -= $total['amount'];
                 }
 
                 $sort_order++;
             }
         }
 
-        $this->request['amount'] = round($this->request['amount'], $precision);
+        $this->request['amount'] = round($amount, $precision);
 
         // Add total
         DocumentTotal::create([
@@ -149,7 +152,7 @@ class CreateDocumentItemsAndTotals extends Job implements HasOwner, HasSource, S
             'document_id' => $this->document->id,
             'code' => 'total',
             'name' => 'invoices.total',
-            'amount' =>  $this->request['amount'],
+            'amount' => $this->request['amount'],
             'sort_order' => $sort_order,
             'created_from' => $this->request['created_from'],
             'created_by' => $this->request['created_by'],
@@ -158,31 +161,35 @@ class CreateDocumentItemsAndTotals extends Job implements HasOwner, HasSource, S
 
     protected function createItems(): array
     {
-        $sub_total = $actual_total = $discount_amount = $discount_amount_total = 0;
+        $sub_total = $actual_total = $discount_amount = $discount_amount_total = $inclusive_discount_difference = 0;
 
         $taxes = [];
 
         if (empty($this->request['items'])) {
-            return [$sub_total, $actual_total, $discount_amount_total, $taxes];
+            return [$sub_total, $actual_total, $discount_amount_total, $taxes, $inclusive_discount_difference];
         }
 
-        if (!empty($this->request['discount']) && $this->request['discount_type'] !== 'percentage') {
+        if (! empty($this->request['discount']) && $this->request['discount_type'] !== 'percentage') {
             $for_fixed_discount = $this->fixedDiscountCalculate();
         }
+
+        $is_percentage = ! empty($this->request['discount']) && ($this->request['discount_type'] === 'percentage');
 
         foreach ((array) $this->request['items'] as $key => $item) {
             $item['global_discount'] = 0;
 
-            if (!empty($this->request['discount'])) {
+            // Disable this lines for global discount issue fixed ( https://github.com/akaunting/akaunting/issues/2797 )
+            if (! empty($this->request['discount'])) {
                 if (isset($for_fixed_discount)) {
                     $item['global_discount'] = ($for_fixed_discount[$key] / ($for_fixed_discount['total'] / 100)) * ($this->request['discount'] / 100);
-                    $item['global_discount_type'] = '';
+                    $item['global_discount_type'] = $this->request['discount_type'];
                 } else {
                     $item['global_discount'] = $this->request['discount'];
                     $item['global_discount_type'] = $this->request['discount_type'];
                 }
             }
 
+            $item['category_id'] = ! empty($item['category_id']) ? $item['category_id'] : $this->request['category_id'];
             $item['created_from'] = $this->request['created_from'];
             $item['created_by'] = $this->request['created_by'];
 
@@ -190,15 +197,16 @@ class CreateDocumentItemsAndTotals extends Job implements HasOwner, HasSource, S
                 $new_item_request = [
                     'company_id' => $this->request['company_id'],
                     'name' => $item['name'],
-                    'description' => $item['description'],
+                    'description' => $item['description'] ?? null,
                     'sale_price' => $item['price'],
                     'purchase_price' => $item['price'],
+                    'category_id' => $item['category_id'],
                     'created_from' => $item['created_from'],
                     'created_by' => $item['created_by'],
                     'enabled' => '1',
                 ];
 
-                if (!empty($item['tax_ids'])) {
+                if (! empty($item['tax_ids'])) {
                     $new_item_request['tax_ids'] = $item['tax_ids'];
                 }
 
@@ -209,11 +217,13 @@ class CreateDocumentItemsAndTotals extends Job implements HasOwner, HasSource, S
 
             $document_item = $this->dispatch(new CreateDocumentItem($this->document, $item));
 
-            $item_amount = (double) $item['price'] * (double) $item['quantity'];
+            # This line changed for discount calculator issue
+            //$item_amount = (double) $item['price'] * (double) $item['quantity'];
+            $item_amount = $document_item->total;
 
             $discount_amount = 0;
 
-            if (!empty($item['discount'])) {
+            if (! empty($item['discount'])) {
                 if ($item['discount_type'] === 'percentage') {
                     $discount_amount = ($item_amount * ($item['discount'] / 100));
                 } else {
@@ -227,24 +237,43 @@ class CreateDocumentItemsAndTotals extends Job implements HasOwner, HasSource, S
 
             $discount_amount_total += $discount_amount;
 
-            if (!$document_item->item_taxes) {
+            // A line with an inclusive tax gets its share of a percentage discount from the
+            // price with the tax in it, but its total is net of that tax. A percentage of the
+            // sub total would take less than the line got, so take what the line got.
+            if ($is_percentage && ! empty($document_item->inclusives)) {
+                $percentage_of_line = $item_amount * ($this->request['discount'] / 100);
+
+                $inclusive_discount_difference += $document_item->global_discount - $percentage_of_line;
+            }
+
+            if (! $document_item->item_taxes) {
                 continue;
             }
 
             // Set taxes
             foreach ((array) $document_item->item_taxes as $item_tax) {
                 if (array_key_exists($item_tax['tax_id'], $taxes)) {
-                    $taxes[$item_tax['tax_id']]['amount'] += $item_tax['amount'];
+                    $taxes[$item_tax['tax_id']]['amount'] += round((float) $item_tax['amount'], $this->document->currency->precision);
                 } else {
                     $taxes[$item_tax['tax_id']] = [
                         'name' => $item_tax['name'],
-                        'amount' => $item_tax['amount'],
+                        'amount' => round((float) $item_tax['amount'], $this->document->currency->precision),
                     ];
                 }
             }
         }
 
-        return [$sub_total, $actual_total, $discount_amount_total, $taxes];
+        // Disable this lines for global discount issue fixed ( https://github.com/akaunting/akaunting/issues/2797 )
+        if (! empty($this->request['discount'])) {
+            if ($this->request['discount_type'] === 'percentage') {
+                $actual_total -= ($sub_total * ($this->request['discount'] / 100));
+                $actual_total -= $inclusive_discount_difference;
+            } else {
+                $actual_total -= $this->request['discount'];
+            }
+        }
+
+        return [$sub_total, $actual_total, $discount_amount_total, $taxes, $inclusive_discount_difference];
     }
 
     public function fixedDiscountCalculate()
@@ -255,10 +284,12 @@ class CreateDocumentItemsAndTotals extends Job implements HasOwner, HasSource, S
             $sub = (double) $item['price'] * (double) $item['quantity'];
 
             if (! empty($this->request['discount'])) {
-                if ($item['discount_type'] === 'percentage') {
-                    $sub -= ($sub * ($item['discount'] / 100));
-                } else {
-                    $sub -= $item['discount'];
+                if (isset($item['discount']) && isset($item['discount_type'])) {
+                    if ($item['discount_type'] === 'percentage') {
+                        $sub -= ($sub * ($item['discount'] / 100));
+                    } else {
+                        $sub -= $item['discount'];
+                    }
                 }
             }
 

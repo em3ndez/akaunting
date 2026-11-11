@@ -25,7 +25,8 @@ class Item extends Controller
     public function __construct()
     {
         // Add CRUD permission check
-        $this->middleware('permission:create-modules-item')->only('install');
+        $this->middleware('permission:create-modules-item')->only('steps', 'download', 'unzip', 'copy', 'install');
+        $this->middleware('permission:read-modules-item')->only('show', 'releases', 'reviews', 'documentation');
         $this->middleware('permission:update-modules-item')->only('update', 'enable', 'disable');
         $this->middleware('permission:delete-modules-item')->only('uninstall');
     }
@@ -239,19 +240,33 @@ class Item extends Controller
         try {
             event(new \App\Events\Module\Installing($request['alias'], company_id()));
 
-            $this->dispatch(new InstallModule($request['alias'], company_id()));
+            $this->dispatch(new InstallModule($request['alias'], company_id(), setting('default.locale')));
 
             $name = module($request['alias'])->getName();
+            $module_routes = module_attribute($request['alias'], 'routes', []);
 
             $message = trans('modules.installed', ['module' => $name]);
 
             flash($message)->success();
 
+            $redirect = route('apps.app.show', $request['alias']);
+
+            // Get module.json redirect route
+            if (! empty($module_routes['redirect_after_install'])) {
+                if (is_array($module_routes['redirect_after_install'])) {
+                    $route = array_shift($module_routes['redirect_after_install']);
+
+                    $redirect = route($route, $module_routes['redirect_after_install']);
+                } else {
+                    $redirect = route($module_routes['redirect_after_install']);
+                }
+            }
+
             $json = [
                 'success' => true,
                 'error' => false,
                 'message' => null,
-                'redirect' => route('apps.app.show', $request['alias']),
+                'redirect' => $redirect,
                 'data' => [
                     'name' => $name,
                     'alias' => $request['alias'],
@@ -278,7 +293,7 @@ class Item extends Controller
         try {
             $name = module($alias)->getName();
 
-            $this->dispatch(new UninstallModule($alias, company_id()));
+            $this->dispatch(new UninstallModule($alias, company_id(), setting('default.locale')));
 
             $message = trans('modules.uninstalled', ['module' => $name]);
 
@@ -297,7 +312,7 @@ class Item extends Controller
         try {
             $name = module($alias)->getName();
 
-            $this->dispatch(new EnableModule($alias, company_id()));
+            $this->dispatch(new EnableModule($alias, company_id(), setting('default.locale')));
 
             $message = trans('modules.enabled', ['module' => $name]);
 
@@ -316,7 +331,7 @@ class Item extends Controller
         try {
             $name = module($alias)->getName();
 
-            $this->dispatch(new DisableModule($alias, company_id()));
+            $this->dispatch(new DisableModule($alias, company_id(), setting('default.locale')));
 
             $message = trans('modules.disabled', ['module' => $name]);
 
@@ -340,7 +355,7 @@ class Item extends Controller
 
         $releases = $this->getModuleReleases($alias, $data);
 
-        $html = view('partials.modules.releases', compact('releases'))->render();
+        $html = view('components.layouts.modules.releases', compact('releases'))->render();
 
         return response()->json([
             'success' => true,
@@ -361,7 +376,7 @@ class Item extends Controller
 
         $reviews = $this->getModuleReviews($alias, $data);
 
-        $html = view('partials.modules.reviews', compact('reviews'))->render();
+        $html = view('components.layouts.modules.reviews', compact('reviews'))->render();
 
         return response()->json([
             'success' => true,

@@ -3,28 +3,38 @@
 namespace App\Http\Controllers\Purchases;
 
 use App\Abstracts\Http\Controller;
-use App\Exports\Purchases\Bills as Export;
+use App\Exports\Purchases\Bills\Bills as Export;
 use App\Http\Requests\Common\Import as ImportRequest;
 use App\Http\Requests\Document\Document as Request;
-use App\Imports\Purchases\Bills as Import;
-use App\Jobs\Banking\CreateBankingDocumentTransaction;
+use App\Imports\Purchases\Bills\Bills as Import;
 use App\Jobs\Document\CreateDocument;
 use App\Jobs\Document\DeleteDocument;
 use App\Jobs\Document\DuplicateDocument;
 use App\Jobs\Document\UpdateDocument;
 use App\Models\Document\Document;
-use App\Models\Setting\Currency;
 use App\Traits\Documents;
-use File;
 
 class Bills extends Controller
 {
     use Documents;
 
+    public string $type = Document::BILL_TYPE;
+
     /**
-     * @var string
+     * Instantiate a new controller instance.
+     *
+     * Security: explicitly gate document state-change methods behind
+     * update-purchases-bills permission. These methods are not in the
+     * canonical CRUD lists of assignPermissionsToController() and would
+     * otherwise run without any permission check.
      */
-    public $type = Document::BILL_TYPE;
+    public function __construct()
+    {
+        parent::__construct();
+
+        $this->middleware('permission:read-purchases-bills')->only('printBill', 'pdfBill');
+        $this->middleware('permission:update-purchases-bills')->only('markReceived', 'markCancelled', 'restoreBill');
+    }
 
     /**
      * Display a listing of the resource.
@@ -33,9 +43,13 @@ class Bills extends Controller
      */
     public function index()
     {
-        $bills = Document::bill()->with('contact', 'transactions')->collect(['issued_at' => 'desc']);
+        $this->setActiveTabForDocuments();
 
-        return $this->response('purchases.bills.index', compact('bills'));
+        $bills = Document::bill()->with('contact', 'items', 'items.taxes', 'item_taxes', 'last_history', 'transactions', 'totals', 'histories', 'media')->collect(['issued_at' => 'desc']);
+
+        $total_bills = Document::bill()->count();
+
+        return $this->response('purchases.bills.index', compact('bills', 'total_bills'));
     }
 
     /**
@@ -47,6 +61,20 @@ class Bills extends Controller
      */
     public function show(Document $bill)
     {
+        $bill->load([
+            'items.taxes.tax',
+            'items.item',
+            'totals',
+            'contact',
+            'currency',
+            'category',
+            'histories',
+            'media',
+            'transactions',
+            'recurring',
+            'children',
+        ]);
+
         return view('purchases.bills.show', compact('bill'));
     }
 
@@ -74,7 +102,7 @@ class Bills extends Controller
         if ($response['success']) {
             $response['redirect'] = route('bills.show', $response['data']->id);
 
-            $message = trans('messages.success.added', ['type' => trans_choice('general.bills', 1)]);
+            $message = trans('messages.success.created', ['type' => trans_choice('general.bills', 1)]);
 
             flash($message)->success();
         } else {
@@ -244,6 +272,24 @@ class Bills extends Controller
     }
 
     /**
+     * Restore the bill.
+     *
+     * @param  Document $bill
+     *
+     * @return Response
+     */
+    public function restoreBill(Document $bill)
+    {
+        event(new \App\Events\Document\DocumentRestored($bill));
+
+        $message = trans('documents.messages.restored', ['type' => trans_choice('general.bills', 1)]);
+
+        flash($message)->success();
+
+        return redirect()->back();
+    }
+
+    /**
      * Print the bill.
      *
      * @param  Document $bill
@@ -281,30 +327,6 @@ class Bills extends Controller
         $file_name = $this->getDocumentFileName($bill);
 
         return $pdf->download($file_name);
-    }
-
-    /**
-     * Mark the bill as paid.
-     *
-     * @param  Document $bill
-     *
-     * @return Response
-     */
-    public function markPaid(Document $bill)
-    {
-        try {
-            $this->dispatch(new CreateBankingDocumentTransaction($bill, ['type' => 'expense']));
-
-            $message = trans('documents.messages.marked_paid', ['type' => trans_choice('general.bills', 1)]);
-
-            flash($message)->success();
-        } catch(\Exception $e) {
-            $message = $e->getMessage();
-
-            flash($message)->error()->important();
-        }
-
-        return redirect()->back();
     }
 
     protected function prepareBill(Document $bill)

@@ -23,10 +23,10 @@ class Document extends FormRequest
 
         $type = $this->request->get('type', Model::INVOICE_TYPE);
 
-        $type = config('type.' . $type . '.route.parameter');
+        $type = config('type.document.' . $type . '.route.parameter');
 
-        // Check if store or update
-        if ($this->getMethod() == 'PATCH') {
+        // Check if store or update. Todo: check if this is the best way to do this
+        if (in_array($this->getMethod(), ['PATCH', 'PUT'])) {
             $model = $this->isApi() ? 'document' : $type;
 
             $id = is_numeric($this->$model) ? $this->$model : $this->{$model}->getAttribute('id');
@@ -35,7 +35,7 @@ class Document extends FormRequest
         }
 
         if ($this->files->get('company_logo')) {
-            $company_logo = 'mimes:' . config('filesystems.mimes') . '|between:0,' . config('filesystems.max_size') * 1024 . '|dimensions:max_width=1000,max_height=1000';
+            $company_logo = 'mimes:' . config('filesystems.mimes') . '|between:0,' . config('filesystems.max_size') * 1024 . '|dimensions:max_width=' . config('filesystems.max_width') . ',max_height=' . config('filesystems.max_height');
         }
 
         if ($this->files->get('attachment')) {
@@ -43,41 +43,84 @@ class Document extends FormRequest
         }
 
         // Get company id
-        $company_id = (int) $this->request->get('company_id');
+        $company_id = (int) $this->request->get('company_id', company_id());
 
         $rules = [
-            'type' => 'required|string',
-            'document_number' => 'required|string|unique:documents,NULL,' . $id . ',id,type,' . $type . ',company_id,' . $company_id . ',deleted_at,NULL',
-            'status' => 'required|string',
-            'issued_at' => 'required|date_format:Y-m-d H:i:s|before_or_equal:due_at',
-            'due_at' => 'required|date_format:Y-m-d H:i:s|after_or_equal:issued_at',
-            'amount' => 'required',
-            'items.*.name' => 'required|string',
-            'items.*.price' => 'required|amount',
-            'currency_code' => 'required|string|currency',
-            'currency_rate' => 'required|gt:0',
-            'contact_id' => 'required|integer',
-            'contact_name' => 'required|string',
-            'category_id' => 'required|integer',
-            'company_logo' => $company_logo,
-            'attachment.*' => $attachment,
-            'recurring_count' => 'gte:0',
-            'recurring_interval' => 'exclude_unless:recurring_frequency,custom|gt:0',
+            'type'                  => 'required|string',
+            'document_number'       => 'required|string|unique:documents,NULL,' . ($id ?? 'null') . ',id,type,' . $type . ',company_id,' . $company_id . ',deleted_at,NULL',
+            //'status'                => 'required|string|in:draft,paid,partial,sent,received,viewed,cancelled',
+            'status'                => 'required|string',
+            'issued_at'             => 'required|date_format:Y-m-d H:i:s|before_or_equal:due_at',
+            'due_at'                => 'required|date_format:Y-m-d H:i:s|after_or_equal:issued_at',
+            'amount'                => 'required',
+            'items.*.name'          => 'required|string|max:255',
+            'items.*.price'         => 'required|amount',
+            'items.*.tax_rates.*'   => 'nullable|numeric|min:0',
+            'currency_code'         => 'required|string|currency',
+            'currency_rate'         => 'required|gt:0',
+            'contact_id'            => 'required|integer|exists:contacts,id,company_id,' . $company_id . ',deleted_at,NULL',
+            'contact_name'          => 'required|string',
+            'category_id'           => 'required|integer|exists:categories,id,company_id,' . $company_id . ',deleted_at,NULL',
+            'company_logo'          => $company_logo,
+            'attachment.*'          => $attachment,
+            'recurring_count'       => 'gte:0',
+            'recurring_interval'    => 'exclude_unless:recurring_frequency,custom|gt:0',
         ];
 
-        $items = $this->request->get('items');
+        // Is Recurring
+        if ($this->request->has('recurring_frequency')) {
+            // first line of the recurring rule
+            if ($this->request->get('recurring_frequency') == 'custom') {
+                $rules['recurring_interval'] = 'required|gte:1';
+                $rules['recurring_custom_frequency'] = 'required|string|in:daily,weekly,monthly,yearly';
+            }
+
+            // second line of the recurring rule
+            $rules['recurring_started_at'] = 'required|date_format:Y-m-d H:i:s';
+
+            switch($this->request->get('recurring_limit')) {
+                case 'date':
+                    $rules['recurring_limit_date'] = 'required|date_format:Y-m-d H:i:s|after_or_equal:recurring_started_at';
+                    break;
+                case 'count':
+                    $rules['recurring_limit_count'] = 'required|gte:0';
+                    break;
+            }
+        }
+
+        $items = $this->request->all('items');
 
         if ($items) {
             foreach ($items as $key => $item) {
-                $size = 5; 
+                $size = 10;
+                $quantityRule = ['required'];
 
-                if (Str::contains($item['quantity'], ['.', ','])) {
-                    $size = 7;
+                // A request does not always carry a quantity for every item, which the
+                // required rule below reports, so the key is not assumed to be there.
+                $quantity = $item['quantity'] ?? null;
+
+                try {
+                    $items[$key]['quantity'] = calculation_to_quantity($quantity);
+                } catch (\InvalidArgumentException $e) {
+                    $quantityRule[] = function ($attribute, $value, $fail) {
+                        $fail(trans('validation.custom.invalid_quantity', [
+                            'attribute' => Str::lower(trans('invoices.quantity')),
+                        ]));
+                    };
                 }
 
-                $rules['items.' . $key . '.quantity'] = 'required|max:' . $size;
+                if (Str::contains((string) $quantity, ['.', ','])) {
+                    $size = 12;
+                }
+
+                $quantityRule[] = 'max:' . $size;
+
+                $rules['items.' . $key . '.quantity'] = $quantityRule;
+
                 $this->items_quantity_size[$key] = $size;
             }
+
+            $this->request->set('items', $items);
         }
 
         return $rules;
@@ -92,6 +135,18 @@ class Document extends FormRequest
 
             $this->request->set('issued_at', $issued_at);
             $this->request->set('due_at', $due_at);
+
+            if ($this->request->has('recurring_started_at')) {
+                $recurring_started_at = Date::parse($this->request->get('recurring_started_at'))->format('Y-m-d');
+
+                $this->request->set('recurring_started_at', $recurring_started_at);
+            }
+
+            if ($this->request->has('recurring_limit_date')) {
+                $recurring_limit_date = Date::parse($this->request->get('recurring_limit_date'))->format('Y-m-d');
+
+                $this->request->set('recurring_limit_date', $recurring_limit_date);
+            }
         }
     }
 
@@ -110,6 +165,12 @@ class Document extends FormRequest
                 $messages['items.' . $key . '.quantity.max'] = trans('validation.size', ['attribute' => Str::lower(trans('invoices.quantity')), 'size' => $quantity_size]);
             }
         }
+
+        $messages['company_logo.dimensions'] = trans('validation.custom.invalid_dimension', [
+            'attribute'     => Str::lower(trans('settings.company.logo')),
+            'width'         => config('filesystems.max_width'),
+            'height'        => config('filesystems.max_height'),
+        ]);
 
         return $messages;
     }

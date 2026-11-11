@@ -3,6 +3,9 @@
 namespace App\Jobs\Setting;
 
 use App\Abstracts\Job;
+use App\Events\Setting\CategoryUpdated;
+use App\Events\Setting\CategoryUpdating;
+use App\Exceptions\Job\NotAllowed;
 use App\Interfaces\Job\ShouldUpdate;
 use App\Models\Setting\Category;
 
@@ -12,9 +15,13 @@ class UpdateCategory extends Job implements ShouldUpdate
     {
         $this->authorize();
 
+        event(new CategoryUpdating($this->model, $this->request));
+
         \DB::transaction(function () {
             $this->model->update($this->request->all());
         });
+
+        event(new CategoryUpdated($this->model, $this->request));
 
         return $this->model;
     }
@@ -24,20 +31,28 @@ class UpdateCategory extends Job implements ShouldUpdate
      */
     public function authorize(): void
     {
+        $type_changed = $this->request->has('type') && ($this->request->get('type') != $this->model->type);
+
+        if ($type_changed && $this->model->isTypeLocked()) {
+            $message = trans('messages.error.locked_type', ['name' => $this->model->name]);
+
+            throw new NotAllowed($message);
+        }
+
         if (! $relationships = $this->getRelationships()) {
             return;
         }
 
-        if ($this->request->has('type') && ($this->request->get('type') != $this->model->type)) {
+        if ($type_changed) {
             $message = trans('messages.error.change_type', ['text' => implode(', ', $relationships)]);
 
-            throw new \Exception($message);
+            throw new NotAllowed($message);
         }
 
-        if (! $this->request->get('enabled')) {
+        if ($this->request->has('enabled') && ! $this->request->get('enabled')) {
             $message = trans('messages.warning.disabled', ['name' => $this->model->name, 'text' => implode(', ', $relationships)]);
 
-            throw new \Exception($message);
+            throw new NotAllowed($message);
         }
     }
 

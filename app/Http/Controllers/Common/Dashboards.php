@@ -25,8 +25,8 @@ class Dashboards extends Controller
     {
         // Add CRUD permission check
         $this->middleware('permission:create-common-dashboards')->only('create', 'store', 'duplicate', 'import');
-        $this->middleware('permission:read-common-dashboards')->only('show');
-        $this->middleware('permission:update-common-dashboards')->only('index', 'edit', 'export', 'update', 'enable', 'disable', 'share');
+        $this->middleware('permission:read-common-dashboards')->only('index', 'show', 'switch');
+        $this->middleware('permission:update-common-dashboards')->only('edit', 'export', 'update', 'enable', 'disable', 'share');
         $this->middleware('permission:delete-common-dashboards')->only('destroy');
     }
 
@@ -37,7 +37,8 @@ class Dashboards extends Controller
      */
     public function index()
     {
-        $dashboards = user()->dashboards()->collect();
+        // Eager load users relationship to prevent N+1 queries in dashboard index view
+        $dashboards = user()->dashboards()->with('users')->collect();
 
         return $this->response('common.dashboards.index', compact('dashboards'));
     }
@@ -71,14 +72,16 @@ class Dashboards extends Controller
             return Widgets::canShow($widget->class);
         });
 
+        $user_dashboards = user()->dashboards()->enabled()->get();
+
         $date_picker_shortcuts = $this->getDatePickerShortcuts();
 
-        if (!request()->has('start_date')) {
-            request()->merge(['start_date' => $date_picker_shortcuts[trans('reports.this_year')]['start']]);
-            request()->merge(['end_date' => $date_picker_shortcuts[trans('reports.this_year')]['end']]);
+        if (! request()->has('start_date')) {
+            request()->merge(['start_date' => $date_picker_shortcuts[trans('general.date_range.this_year')]['start']]);
+            request()->merge(['end_date' => $date_picker_shortcuts[trans('general.date_range.this_year')]['end']]);
         }
 
-        return view('common.dashboards.show', compact('dashboard', 'widgets', 'date_picker_shortcuts'));
+        return view('common.dashboards.show', compact('dashboard', 'widgets', 'user_dashboards', 'date_picker_shortcuts'));
     }
 
     /**
@@ -88,7 +91,11 @@ class Dashboards extends Controller
      */
     public function create()
     {
-        $users = company()->users()->get()->sortBy('name');
+        $users = company()->users()->get()->reject(function ($user) {
+            if ($user->cannot('read-admin-panel')) {
+                return true;
+            }
+        })->sortBy('name');
 
         return view('common.dashboards.create', compact('users'));
     }
@@ -106,7 +113,7 @@ class Dashboards extends Controller
         if ($response['success']) {
             $response['redirect'] = route('dashboards.index');
 
-            $message = trans('messages.success.added', ['type' => trans_choice('general.dashboards', 1)]);
+            $message = trans('messages.success.created', ['type' => trans_choice('general.dashboards', 1)]);
 
             flash($message)->success();
         } else {
@@ -133,7 +140,13 @@ class Dashboards extends Controller
             return redirect()->route('dashboards.index');
         }
 
-        $users = company()->users()->get()->sortBy('name');
+        $dashboard->load('users');
+
+        $users = company()->users()->get()->reject(function ($user) {
+            if ($user->cannot('read-admin-panel')) {
+                return true;
+            }
+        })->sortBy('name');
 
         return view('common.dashboards.edit', compact('dashboard', 'users'));
     }

@@ -9,12 +9,19 @@ class Vendors extends Export
 {
     public function collection()
     {
-        return Model::vendor()->collectForExport($this->ids);
+        return Model::with('category')->vendor()->collectForExport($this->ids);
     }
 
     public function map($model): array
     {
-        $model->country = ($model->country) ? trans('countries.' . $model->country) : null;
+        $country = null;
+
+        if ($model->country && array_key_exists($model->country, trans('countries'))) {
+            $country = trans('countries.' . $model->country);
+        }
+
+        $model->country = $country;
+        $model->category_name = $model->category->name ?? null;
 
         return parent::map($model);
     }
@@ -33,9 +40,9 @@ class Vendors extends Export
             'city',
             'website',
             'currency_code',
+            'category_name',
             'reference',
             'enabled',
-            'user_id',
         ];
     }
 }

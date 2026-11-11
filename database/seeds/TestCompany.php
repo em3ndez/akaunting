@@ -7,12 +7,13 @@ use App\Jobs\Auth\CreateUser;
 use App\Jobs\Common\CreateCompany;
 use App\Jobs\Common\CreateContact;
 use App\Traits\Jobs;
+use App\Traits\Modules;
 use Artisan;
 use Illuminate\Database\Seeder;
 
 class TestCompany extends Seeder
 {
-    use Jobs;
+    use Jobs, Modules;
 
     /**
      * Run the database seeds.
@@ -22,6 +23,8 @@ class TestCompany extends Seeder
     public function run()
     {
         Model::unguard();
+
+        $this->migrateRoles();
 
         $this->call(Permissions::class);
 
@@ -36,6 +39,18 @@ class TestCompany extends Seeder
         Model::reguard();
     }
 
+    private function migrateRoles()
+    {
+        if (! $this->moduleExists('roles')) {
+            return;
+        }
+
+        Artisan::call('module:migrate', [
+            'alias' => 'roles',
+            '--force' => true
+        ]);
+    }
+
     private function createCompany()
     {
         $company = $this->dispatch(new CreateCompany([
@@ -45,6 +60,7 @@ class TestCompany extends Seeder
             'address' => 'New Street 1254',
             'currency' => 'USD',
             'locale' => 'en-GB',
+            'country' => 'US',
             'enabled' => '1',
             'settings' => [
                 'schedule.send_invoice_reminder' => '1',
@@ -56,6 +72,9 @@ class TestCompany extends Seeder
         ]));
 
         $company->makeCurrent(true);
+
+        setting()->set('email.protocol', 'log');
+        config(['mail.default' => setting('email.protocol')]);
 
         $this->command->info('Test company created.');
     }
@@ -81,7 +100,7 @@ class TestCompany extends Seeder
             'type' => 'customer',
             'name' => 'Test Customer',
             'email' => 'customer@company.com',
-            'currency_code' => setting('default.currency'),
+            'currency_code' => default_currency(),
             'password' => '123456',
             'password_confirmation' => '123456',
             'company_id' => company_id(),

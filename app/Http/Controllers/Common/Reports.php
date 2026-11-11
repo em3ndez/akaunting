@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Common;
 
 use App\Abstracts\Http\Controller;
 use App\Http\Requests\Common\Report as Request;
+use App\Http\Requests\Common\ReportShow as ShowRequest;
 use App\Jobs\Common\CreateReport;
 use App\Jobs\Common\DeleteReport;
 use App\Jobs\Common\UpdateReport;
 use App\Models\Common\Report;
+use App\Utilities\ReportCache;
 use App\Utilities\Reports as Utility;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Http\RedirectResponse;
 
 class Reports extends Controller
 {
@@ -20,7 +22,7 @@ class Reports extends Controller
     {
         // Add CRUD permission check
         $this->middleware('permission:create-common-reports')->only('create', 'store', 'duplicate', 'import');
-        $this->middleware('permission:read-common-reports')->only('index', 'show', 'export');
+        $this->middleware('permission:read-common-reports')->only('index', 'show', 'export', 'print', 'pdf', 'clear', 'fields');
         $this->middleware('permission:update-common-reports')->only('edit', 'update', 'enable', 'disable');
         $this->middleware('permission:delete-common-reports')->only('destroy');
     }
@@ -32,50 +34,82 @@ class Reports extends Controller
      */
     public function index()
     {
-        $totals = $icons = $categories = [];
+        $icons = $categories = [];
 
         $reports = Report::orderBy('name')->get();
 
+        // Pre-compute which module aliases are enabled once, so the loop
+        // never re-reads module JSON files from disk (150+ modules were causing 256s+ timeouts).
+        $moduleStatusCache = [];
+
         foreach ($reports as $report) {
-            if (!Utility::canShow($report->class)) {
+            $alias = $report->alias ?? 'core';
+
+            // Check module enabled status from cache
+            if ($alias !== 'core') {
+                if (! array_key_exists($alias, $moduleStatusCache)) {
+                    $moduleStatusCache[$alias] = Utility::isModuleEnabled($report->class);
+                }
+
+                if (! $moduleStatusCache[$alias]) {
+                    continue;
+                }
+            }
+
+            // Permission check (no disk I/O, just DB/memory)
+            if (Utility::cannotRead($report->class)) {
                 continue;
             }
 
-            $class = Utility::getClassInstance($report, false);
-
-            if (empty($class)) {
+            if (! class_exists($report->class)) {
                 continue;
             }
 
-            $ttl = 3600 * 6; // 6 hours
+            // Read icon & category from class properties via reflection
+            // instead of instantiating (which triggers setGroups() event dispatch for every single report).
+            $ref = new \ReflectionClass($report->class);
 
-            $totals[$report->id] = Cache::remember('reports.totals.' . $report->id, $ttl, function () use ($class) {
-                return $class->getGrandTotal();
-            });
+            $iconProp = $ref->getProperty('icon');
+            $icons[$report->id] = $iconProp->getDefaultValue() ?? 'donut_small';
 
-            $icons[$report->id] = $class->getIcon();
-            $categories[$class->getCategory()][] = $report;
+            $categoryProp = $ref->getProperty('category');
+            $categoryKey = $categoryProp->getDefaultValue() ?? 'reports.income_expense';
+            $category = trans($categoryKey);
+
+            if (empty($categories[$category])) {
+                $descKey = null;
+
+                if ($ref->hasProperty('category_description')) {
+                    $descKey = $ref->getProperty('category_description')->getDefaultValue();
+                }
+
+                $categories[$category] = [
+                    'name' => $category,
+                    'description' => $descKey ? trans($descKey) : '',
+                    'reports' => [$report],
+                ];
+            } else {
+                $categories[$category]['reports'][] = $report;
+            }
         }
 
-        return $this->response('common.reports.index', compact('categories', 'totals', 'icons'));
+        return $this->response('common.reports.index', compact('categories', 'icons'));
     }
 
     /**
      * Show the form for viewing the specified resource.
      *
      * @param  Report $report
+     * @param  ShowRequest $request
      * @return Response
      */
-    public function show(Report $report)
+    public function show(Report $report, ShowRequest $request)
     {
-        if (!Utility::canShow($report->class)) {
+        if (Utility::cannotShow($report->class)) {
             abort(403);
         }
 
-        $class = Utility::getClassInstance($report);
-
-        // Update cache
-        Cache::put('reports.totals.' . $report->id, $class->getGrandTotal());
+        $class = ReportCache::getClassInstance($report);
 
         return $class->show();
     }
@@ -105,7 +139,7 @@ class Reports extends Controller
         if ($response['success']) {
             $response['redirect'] = route('reports.index');
 
-            $message = trans('messages.success.added', ['type' => trans_choice('general.reports', 1)]);
+            $message = trans('messages.success.created', ['type' => trans_choice('general.reports', 1)]);
 
             flash($message)->success();
         } else {
@@ -215,11 +249,26 @@ class Reports extends Controller
      */
     public function print(Report $report)
     {
-        if (!Utility::canShow($report->class)) {
+        if (Utility::cannotShow($report->class)) {
             abort(403);
         }
 
-        return Utility::getClassInstance($report)->print();
+        return ReportCache::getClassInstance($report)->print();
+    }
+
+    /**
+     * Download PDF file of the report.
+     *
+     * @param  Report $report
+     * @return Response
+     */
+    public function pdf(Report $report)
+    {
+        if (Utility::cannotShow($report->class)) {
+            abort(403);
+        }
+
+        return ReportCache::getClassInstance($report)->pdf();
     }
 
     /**
@@ -230,11 +279,31 @@ class Reports extends Controller
      */
     public function export(Report $report)
     {
-        if (!Utility::canShow($report->class)) {
+        if (Utility::cannotShow($report->class)) {
             abort(403);
         }
 
-        return Utility::getClassInstance($report)->export();
+        return ReportCache::getClassInstance($report)->export();
+    }
+
+    /**
+     * Rebuild the cached copy of the report and show it again.
+     *
+     * @param  Report $report
+     * @return RedirectResponse
+     */
+    public function clear(Report $report): RedirectResponse
+    {
+        if (Utility::cannotShow($report->class)) {
+            abort(403);
+        }
+
+        ReportCache::clear($report->company_id, $report->id);
+
+        // The raw query string, as the page had it before load() folded its keys into search
+        $query = request()->getQueryString();
+
+        return redirect(route('reports.show', $report->id) . ($query ? '?' . $query : ''));
     }
 
     /**
@@ -257,32 +326,13 @@ class Reports extends Controller
 
         $fields = (new $class())->getFields();
 
-        $html = view('partials.reports.fields', compact('fields'))->render();
+        $html = view('components.reports.fields', compact('fields'))->render();
 
         return response()->json([
             'success' => true,
             'error' => false,
             'message' => '',
             'html' => $html,
-        ]);
-    }
-
-    /**
-     * Clear the cache of the resource.
-     *
-     * @return Response
-     */
-    public function clear(Report $report)
-    {
-        $data = Utility::getClassInstance($report)->getGrandTotal();
-
-        Cache::put('reports.totals.' . $report->id, $data);
-
-        return response()->json([
-            'success' => true,
-            'error' => false,
-            'data' => $data,
-            'message' => '',
         ]);
     }
 }

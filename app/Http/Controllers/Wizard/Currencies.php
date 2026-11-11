@@ -69,7 +69,7 @@ class Currencies extends Controller
         $response = $this->ajaxDispatch(new CreateCurrency($request));
 
         if ($response['success']) {
-            $message = trans('messages.success.added', ['type' => trans_choice('general.currencies', 1)]);
+            $message = trans('messages.success.created', ['type' => trans_choice('general.currencies', 1)]);
         } else {
             $message = $response['message'];
         }
@@ -91,6 +91,8 @@ class Currencies extends Controller
     {
         $response = $this->ajaxDispatch(new UpdateCurrency($currency, $request));
 
+        $currency->default = default_currency() == $currency->code;
+
         if ($response['success']) {
             $message = trans('messages.success.updated', ['type' => $currency->name]);
         } else {
@@ -98,7 +100,7 @@ class Currencies extends Controller
         }
 
         $response['message'] = $message;
-        
+
         return response()->json($response);
     }
 

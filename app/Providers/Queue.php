@@ -3,12 +3,15 @@
 namespace App\Providers;
 
 use App\Notifications\Common\ImportFailed;
+use App\Traits\Modules;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\ServiceProvider as Provider;
 
 class Queue extends Provider
 {
+    use Modules;
+
     /**
      * Register any application services.
      *
@@ -17,6 +20,26 @@ class Queue extends Provider
     public function register()
     {
         //
+    }
+
+    /**
+     * Empty the model cache, when it is kept in memory. A store shared between processes is
+     * left alone, as what one job cached there is still valid for the next, and so is the
+     * application's own cache store: jobs may read there what an earlier one put.
+     */
+    protected function flushModelCache(): void
+    {
+        $store = config('laravel-model-caching.store');
+
+        if (empty($store) || $store === config('cache.default')) {
+            return;
+        }
+
+        if (config('cache.stores.' . $store . '.driver') !== 'array') {
+            return;
+        }
+
+        app('cache')->store($store)->flush();
     }
 
     /**
@@ -36,28 +59,56 @@ class Queue extends Provider
             return ['company_id' => $company_id];
         });
 
+        // A worker runs job after job in one process, and the model cache keeps its entries in
+        // that process when its store is "array", so each job left its cached queries behind
+        // for the next and the worker's memory only grew. Every job starts with an empty one.
         app('events')->listen(JobProcessing::class, function ($event) {
-            if (! defined('APP_RUNNING_IN_QUEUE')) {
-                define('APP_RUNNING_IN_QUEUE', true);
+            // A job run in place (the sync connection) is part of the request or command around it
+            if ($event->connectionName === 'sync') {
+                return;
             }
 
+            $this->flushModelCache();
+        });
+
+        app('events')->listen(JobProcessing::class, function ($event) {
             $payload = $event->job->payload();
 
-            if (!array_key_exists('company_id', $payload)) {
-                $event->job->delete();
-
-                throw new \Exception('Missing company. Payload: ' . json_encode($payload));
+            if (! array_key_exists('company_id', $payload)) {
+                return;
             }
 
-            $company = company($payload['company_id']);
+            try {
+                $company = company($payload['company_id']);
+            } catch (\Throwable $e) {
+                $event->job->delete();
+
+                logger()->warning('Company could not be resolved for queued job, job deleted.', [
+                    'company_id' => $payload['company_id'],
+                    'payload' => $payload,
+                    'exception' => $e->getMessage(),
+                ]);
+
+                return;
+            }
 
             if (empty($company)) {
                 $event->job->delete();
 
-                throw new \Exception('Company not found. Payload: ' . json_encode($payload));
+                logger()->warning('Company not found, job deleted.', [
+                    'company_id' => $payload['company_id'],
+                    'payload' => $payload,
+                ]);
+
+                return;
             }
 
             $company->makeCurrent();
+
+            // TODO: Move queue control at the beginning of the closure
+            if (should_queue()) {
+                $this->registerModules();
+            }
         });
 
         app('events')->listen(JobFailed::class, function ($event) {

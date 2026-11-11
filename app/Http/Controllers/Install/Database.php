@@ -15,7 +15,13 @@ class Database extends Controller
      */
     public function create()
     {
-        return view('install.database.create');
+        return view('install.database.create', [
+            'host'      => env('DB_HOST'    , 'localhost'),
+            'username'  => env('DB_USERNAME', ''),
+            'password'  => env('DB_PASSWORD', ''),
+            // The Docker image documents DB_NAME, so fall back to it to pre-fill the form
+            'database'  => env('DB_DATABASE', env('DB_NAME', '')),
+        ]);
     }
 
     /**
@@ -34,9 +40,10 @@ class Database extends Controller
         $database = $request['database'];
         $username = $request['username'];
         $password = $request['password'];
+        $prefix   = config("database.connections.$connection.prefix", null);
 
         // Check database connection
-        if (!Installer::createDbTables($host, $port, $database, $username, $password)) {
+        if (!Installer::createDbTables($host, $port, $database, $username, $password, $prefix)) {
             $response = [
                 'status' => null,
                 'success' => false,

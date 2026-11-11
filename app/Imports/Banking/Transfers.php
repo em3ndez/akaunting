@@ -4,18 +4,31 @@ namespace App\Imports\Banking;
 
 use App\Abstracts\Import;
 use App\Jobs\Banking\CreateTransaction;
+use App\Models\Banking\Transaction;
 use App\Models\Banking\Transfer as Model;
-use App\Models\Setting\Category;
+use App\Traits\Categories;
 use App\Traits\Currencies;
 use App\Traits\Jobs;
+use App\Traits\Transactions;
 use App\Utilities\Date;
 
 class Transfers extends Import
 {
-    use Currencies, Jobs;
+    use Categories, Currencies, Jobs, Transactions;
+
+    public $model = Model::class;
+
+    public $columns = [
+        'expense_transaction_id',
+        'income_transaction_id',
+    ];
 
     public function model(array $row)
     {
+        if (self::hasRow($row)) {
+            return;
+        }
+
         return new Model($row);
     }
 
@@ -23,7 +36,9 @@ class Transfers extends Import
     {
         $row = parent::map($row);
 
-        $row['transferred_at'] = Date::parse($row['transferred_at'])->format('Y-m-d');
+        $row['transferred_at'] = $this->normalizeTransferredAt($row['transferred_at'] ?? null);
+        $row['from_currency_code'] = $this->getFromCurrencyCode($row);
+        $row['to_currency_code'] = $this->getToCurrencyCode($row);
         $row['from_account_id'] = $this->getFromAccountId($row);
         $row['to_account_id'] = $this->getToAccountId($row);
         $row['expense_transaction_id'] = $this->getExpenseTransactionId($row);
@@ -37,10 +52,10 @@ class Transfers extends Import
         return [
             'from_account_id' => 'required|integer',
             'from_currency_code' => 'required|string|currency',
-            'from_currency_rate' => 'required',
+            'from_currency_rate' => 'required|gt:0',
             'to_account_id' => 'required|integer',
             'to_currency_code' => 'required|string|currency',
-            'to_currency_rate' => 'required',
+            'to_currency_rate' => 'required|gt:0',
             'amount' => 'required|amount',
             'transferred_at' => 'required|date_format:Y-m-d',
             'payment_method' => 'required|string',
@@ -51,7 +66,8 @@ class Transfers extends Import
     {
         $expense_transaction = $this->dispatch(new CreateTransaction([
             'company_id' => $row['company_id'],
-            'type' => 'expense',
+            'number' => $this->getNextTransactionNumber(),
+            'type' => Transaction::EXPENSE_TRANSFER_TYPE,
             'account_id' => $row['from_account_id'],
             'paid_at' => $row['transferred_at'],
             'currency_code' => $row['from_currency_code'],
@@ -59,7 +75,7 @@ class Transfers extends Import
             'amount' => $row['amount'],
             'contact_id' => 0,
             'description' => $row['description'],
-            'category_id' => Category::transfer(), // Transfer Category ID
+            'category_id' => $this->getTransferCategoryId(),
             'payment_method' => $row['payment_method'],
             'reference' => $row['reference'],
             'created_by' => $row['created_by'],
@@ -85,7 +101,8 @@ class Transfers extends Import
 
         $income_transaction = $this->dispatch(new CreateTransaction([
             'company_id' => $row['company_id'],
-            'type' => 'income',
+            'number' => $this->getNextTransactionNumber(),
+            'type' => Transaction::INCOME_TRANSFER_TYPE,
             'account_id' => $row['to_account_id'],
             'paid_at' => $row['transferred_at'],
             'currency_code' => $row['to_currency_code'],
@@ -93,7 +110,7 @@ class Transfers extends Import
             'amount' => $amount,
             'contact_id' => 0,
             'description' => $row['description'],
-            'category_id' => Category::transfer(), // Transfer Category ID
+            'category_id' => $this->getTransferCategoryId(),
             'payment_method' => $row['payment_method'],
             'reference' => $row['reference'],
             'created_by' => $row['created_by'],
@@ -120,5 +137,34 @@ class Transfers extends Import
         $row['currency_code'] = $row['to_currency_code'] ?? null;
 
         return $this->getAccountId($row);
+    }
+
+    private function getFromCurrencyCode($row)
+    {
+        $row['currency_code'] = $row['from_currency_code'] ?? null;
+        $row['currency_rate'] = $row['from_currency_rate'] ?? null;
+
+        return $this->getCurrencyCode($row);
+    }
+
+    private function getToCurrencyCode($row)
+    {
+        $row['currency_code'] = $row['to_currency_code'] ?? null;
+        $row['currency_rate'] = $row['to_currency_rate'] ?? null;
+
+        return $this->getCurrencyCode($row);
+    }
+
+    protected function normalizeTransferredAt($value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2}:\d{2})?$/', $value)) {
+            return substr((string) $value, 0, 10);
+        }
+
+        return Date::parseWithFallbackLocales($value, null, [$this->preferredLocale()])->format('Y-m-d');
     }
 }

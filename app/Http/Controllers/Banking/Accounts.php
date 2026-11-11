@@ -10,12 +10,27 @@ use App\Jobs\Banking\UpdateAccount;
 use App\Models\Banking\Account;
 use App\Models\Banking\Transaction;
 use App\Models\Banking\Transfer;
-use App\Utilities\Reports as Utility;
+use App\Traits\Cloud;
+use App\Utilities\Reports;
 use App\Models\Setting\Currency;
-use Date;
 
 class Accounts extends Controller
 {
+    use Cloud;
+
+    /**
+     * Instantiate a new controller instance.
+     */
+    public function __construct()
+    {
+        parent::__construct();
+
+        $this->middleware('permission:create-banking-transactions')->only('createIncome', 'createExpense', 'importTransactions');
+        $this->middleware('permission:create-banking-transfers')->only('createTransfer');
+        $this->middleware('permission:read-banking-accounts')->only('seePerformance');
+        $this->middleware('permission:read-settings-currencies')->only('currency');
+    }
+
     /**
      * Display a listing of the resource.
      *
@@ -23,7 +38,12 @@ class Accounts extends Controller
      */
     public function index()
     {
-        $accounts = Account::with('income_transactions', 'expense_transactions')->collect();
+        // The currency is read by every card, so it is loaded with the page rather than per account
+        $accounts = Account::with('currency')
+            ->withSum('income_transactions', 'amount')
+            ->withSum('expense_transactions', 'amount')
+            ->withCount('transactions')
+            ->collect();
 
         return $this->response('banking.accounts.index', compact('accounts'));
     }
@@ -35,36 +55,47 @@ class Accounts extends Controller
      */
     public function show(Account $account)
     {
-        // Handle transactions
-        $transactions = Transaction::with('account', 'category')->where('account_id', $account->id)->collect('paid_at');
+        $transactions = Transaction::with('category', 'contact', 'contact.media', 'document', 'document.totals', 'document.media', 'recurring', 'media')->where('account_id', $account->id)->collect(['paid_at'=> 'desc']);
 
-        $transfers = Transfer::with('expense_transaction', 'income_transaction')->get()->filter(function ($transfer) use($account) {
-            if ($transfer->expense_account->id == $account->id || $transfer->income_account->id == $account->id) {
-                return true;
-            }
+        $transfers = Transfer::with('expense_transaction', 'expense_transaction.account', 'income_transaction', 'income_transaction.account')
+                                ->whereHas('expense_transaction', fn ($query) => $query->where('account_id', $account->id))
+                                ->orWhereHas('income_transaction', fn ($query) => $query->where('account_id', $account->id))
+                                ->collect(['expense_transaction.paid_at' => 'desc']);
 
-            return false;
-        })->sortByDesc(function ($transfer) {
-            return $transfer->expense_transaction->paid_at;
-        });
+        $incoming_amount = money($account->income_balance, $account->currency_code);
+        $outgoing_amount = money($account->expense_balance, $account->currency_code);
+        $current_amount = money($account->balance, $account->currency_code);
 
-        $limit = (int) request('limit', setting('default.list_limit', '25'));
-        $transfers = $this->paginate($transfers, $limit);
+        $summary_amounts = [
+            'incoming_exact'        => $incoming_amount->format(),
+            'incoming_for_humans'   => $incoming_amount->formatForHumans(),
+            'outgoing_exact'        => $outgoing_amount->format(),
+            'outgoing_for_humans'   => $outgoing_amount->formatForHumans(),
+            'current_exact'         => $current_amount->format(),
+            'current_for_humans'    => $current_amount->formatForHumans(),
+        ];
 
-        return view('banking.accounts.show', compact('account', 'transactions', 'transfers'));
+        return view('banking.accounts.show', compact('account', 'transactions', 'transfers', 'summary_amounts'));
     }
+
     /**
      * Show the form for creating a new resource.
+     *
+     * An account that could keep itself up to date should not be typed in by hand without the
+     * option having been seen. While the app that connects banks is missing, the page offers it
+     * in place of the form, the way an empty list offers what can be added to it, and the form
+     * is behind "add without bank feed". With the app installed, the app takes the page over.
      *
      * @return Response
      */
     public function create()
     {
-        $currencies = Currency::enabled()->pluck('name', 'code');
+        $currency = Currency::where('code', '=', default_currency())->first();
 
-        $currency = Currency::where('code', '=', setting('default.currency'))->first();
+        // Without Bank Feeds the page offers it before the form for an account kept by hand
+        $bank_feed_offer = ! $this->hasCloudBankFeeds();
 
-        return view('banking.accounts.create', compact('currencies', 'currency'));
+        return view('banking.accounts.create', compact('currency', 'bank_feed_offer'));
     }
 
     /**
@@ -81,7 +112,7 @@ class Accounts extends Controller
         if ($response['success']) {
             $response['redirect'] = route('accounts.show', $response['data']->id);
 
-            $message = trans('messages.success.added', ['type' => trans_choice('general.accounts', 1)]);
+            $message = trans('messages.success.created', ['type' => trans_choice('general.accounts', 1)]);
 
             flash($message)->success();
         } else {
@@ -96,24 +127,6 @@ class Accounts extends Controller
     }
 
     /**
-     * Duplicate the specified resource.
-     *
-     * @param  Account $account
-     *
-     * @return Response
-     */
-    public function duplicate(Account $account)
-    {
-        $clone = $account->duplicate();
-
-        $message = trans('messages.success.duplicated', ['type' => trans_choice('general.accounts', 1)]);
-
-        flash($message)->success();
-
-        return redirect()->route('accounts.edit', $clone->id);
-    }
-
-    /**
      * Show the form for editing the specified resource.
      *
      * @param  Account  $account
@@ -122,13 +135,11 @@ class Accounts extends Controller
      */
     public function edit(Account $account)
     {
-        $currencies = Currency::enabled()->pluck('name', 'code');
-
         $account->default_account = ($account->id == setting('default.account')) ? 1 : 0;
 
         $currency = Currency::where('code', '=', $account->currency_code)->first();
 
-        return view('banking.accounts.edit', compact('account', 'currencies', 'currency'));
+        return view('banking.accounts.edit', compact('account', 'currency'));
     }
 
     /**
@@ -175,7 +186,20 @@ class Accounts extends Controller
             $response['message'] = trans('messages.success.enabled', ['type' => $account->name]);
         }
 
-        return response()->json($response);
+        // The bulk actions ask for this in the background and are handed the outcome to
+        // read; a link on a page is followed by the browser, which has nowhere to put an
+        // answer, so it is sent back to the page it came from with the outcome flashed on it
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json($response);
+        }
+
+        if (! empty($response['success'])) {
+            flash($response['message'])->success();
+        } else {
+            flash($response['message'])->error()->important();
+        }
+
+        return redirect()->back();
     }
 
     /**
@@ -193,7 +217,20 @@ class Accounts extends Controller
             $response['message'] = trans('messages.success.disabled', ['type' => $account->name]);
         }
 
-        return response()->json($response);
+        // The bulk actions ask for this in the background and are handed the outcome to
+        // read; a link on a page is followed by the browser, which has nowhere to put an
+        // answer, so it is sent back to the page it came from with the outcome flashed on it
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json($response);
+        }
+
+        if (! empty($response['success'])) {
+            flash($response['message'])->success();
+        } else {
+            flash($response['message'])->error()->important();
+        }
+
+        return redirect()->back();
     }
 
     /**
@@ -222,18 +259,18 @@ class Accounts extends Controller
         return response()->json($response);
     }
 
-    public function createRevenue(Account $account)
+    public function createIncome(Account $account)
     {
         $data['account_id'] = $account->id;
 
-        return redirect()->route('revenues.create')->withInput($data);
+        return redirect()->route('transactions.create', ['type' => 'income'])->withInput($data);
     }
 
-    public function createPayment(Account $account)
+    public function createExpense(Account $account)
     {
         $data['account_id'] = $account->id;
 
-        return redirect()->route('payments.create')->withInput($data);
+        return redirect()->route('transactions.create', ['type' => 'expense'])->withInput($data);
     }
 
     public function createTransfer(Account $account)
@@ -243,15 +280,31 @@ class Accounts extends Controller
         return redirect()->route('transfers.create')->withInput($data);
     }
 
+    /**
+     * The transaction import, already pointed at this account.
+     *
+     * Carried in the address rather than in the session, so the page still knows the account
+     * after a reload or a failed import that sends the user back to it.
+     */
+    public function importTransactions(Account $account)
+    {
+        $data['account_id'] = $account->id;
+
+        return redirect()->route('import.create', [
+            'group'         => 'banking',
+            'type'          => 'transactions',
+        ])->withInput($data);
+    }
+
     public function seePerformance(Account $account)
     {
+        // No dates: the report opens on the current financial year
         $data = [
-            'year'          => Date::now()->year,
             'basis'         => 'accrual',
             'account_id'    => $account->id,
         ];
 
-        $report = Utility::getClassInstance('App\Reports\IncomeExpenseSummary');
+        $report = Reports::getClassInstance('App\Reports\IncomeExpenseSummary', false);
 
         if (empty($report) || empty($report->model)) {
             $message = trans('accounts.create_report');
@@ -261,7 +314,10 @@ class Accounts extends Controller
             return redirect()->route('reports.create');
         }
 
-        return redirect()->route('reports.show', $report->model->id)->withInput($data);
+        // In the search string rather than flashed, so refresh, print, reload and bookmarks keep the filter
+        $search = collect($data)->map(fn ($value, $key) => $key . ':' . $value)->implode(' ');
+
+        return redirect()->route('reports.show', ['report' => $report->model->id, 'search' => $search]);
     }
 
     public function currency()
@@ -278,7 +334,7 @@ class Accounts extends Controller
             return response()->json([]);
         }
 
-        $currency_code = setting('default.currency');
+        $currency_code = default_currency();
 
         if (isset($account->currency_code)) {
             $currencies = Currency::enabled()->pluck('name', 'code')->toArray();
@@ -291,16 +347,16 @@ class Accounts extends Controller
         // Get currency object
         $currency = Currency::where('code', $currency_code)->first();
 
-        $account->currency_name = $currency->name;
-        $account->currency_code = $currency_code;
-        $account->currency_rate = $currency->rate;
-
-        $account->thousands_separator = $currency->thousands_separator;
-        $account->decimal_mark = $currency->decimal_mark;
-        $account->precision = (int) $currency->precision;
-        $account->symbol_first = $currency->symbol_first;
-        $account->symbol = $currency->symbol;
-
-        return response()->json($account);
+        return response()->json([
+            'id' => $account->id,
+            'currency_name' => $currency->name,
+            'currency_code' => $currency_code,
+            'currency_rate' => $currency->rate,
+            'thousands_separator' => $currency->thousands_separator,
+            'decimal_mark' => $currency->decimal_mark,
+            'precision' => (int) $currency->precision,
+            'symbol_first' => $currency->symbol_first,
+            'symbol' => $currency->symbol,
+        ]);
     }
 }

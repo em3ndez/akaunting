@@ -21,7 +21,8 @@ return [
         'disabled'          => ':feature трябва да бъде дезактивирана!',
         'extension'         => ':extension разширението трябва да бъде заредено!',
         'directory'         => ':directory директорията трябва да е с разрешение за промяна!',
-        'executable'        => 'The PHP CLI executable file is not working! Please, ask your hosting company to set PHP_BINARY or PHP_PATH environment variable correctly.',
+        'executable'        => 'Изпълнимият файл на PHP CLI не е зададен/не работи или версията му не е :php_version или по-нова! Моля, помолете хостинг компанията си да зададе правилно променливата на средата PHP_BINARY или PHP_PATH.',
+        'npm'               => '<b>Липсват JavaScript файлове!</b> <br><br><span>Трябва да изпълните командите <em class="underline">npm install</em> и <em class="underline">npm run dev</em>.</span>',
     ],
 
     'database' => [
@@ -43,4 +44,8 @@ return [
         'connection'        => 'Грешка: Не можа да се свърже с базата данни! Моля, уверете се, че данните са правилни.',
     ],
 
+    'update' => [
+        'core'              => 'Нова версия на Akaunting е налична! Моля, актуализирайте  <a href=":url">вашата инсталация.</a>',
+        'module'            => 'Нова версия на :module е налична! Моля, актуализирайте <a href=":url">вашата инсталация.</a>',
+    ],
 ];

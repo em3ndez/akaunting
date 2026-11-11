@@ -2,26 +2,17 @@
 
 namespace App\Traits;
 
-use App\Traits\SearchString;
+use App\Utilities\Date;
 use Carbon\CarbonPeriod;
-use Date;
 
 trait DateTime
 {
-    use SearchString;
-
-    /*
-     * Get the date format based on company settings.
-     * getDateFormat method is used by Eloquent
-     *
-     * @return string
-     */
-    public function getCompanyDateFormat()
+    public function getCompanyDateFormat(): string
     {
         $default = 'd M Y';
 
         // Make sure it's installed
-        if (!config('app.installed') && (config('app.env') !== 'testing')) {
+        if (! config('app.installed') && ! env_is_testing()) {
             return $default;
         }
 
@@ -32,120 +23,142 @@ trait DateTime
 
         $chars = ['dash' => '-', 'slash' => '/', 'dot' => '.', 'comma' => ',', 'space' => ' '];
 
-        $date_format = setting('localisation.date_format', $default);
-        $date_separator = $chars[setting('localisation.date_separator', 'space')];
+        $date_format = setting('localisation.date_format', $default) ?? $default;
+
+        $char = setting('localisation.date_separator', 'space') ?? 'space';
+        $date_separator = $chars[$char];
 
         return str_replace(' ', $date_separator, $date_format);
     }
 
-    public function scopeMonthsOfYear($query, $field)
+    public function scopeDateFilter($query, string $field)
     {
-        $now = Date::now();
-        $year = $this->getSearchStringValue('year', $now->year);
+        [$start, $end] = $this->getStartAndEndDates();
 
-        $financial_start = $this->getFinancialStart($year);
+        return $query->whereBetween($field, [$start->toDateTimeString(), $end->toDateTimeString()]);
+    }
 
-        // Check if FS has been customized
-        if ($now->startOfYear()->format('Y-m-d') === $financial_start->format('Y-m-d')) {
-            $start = Date::parse($year . '-01-01')->startOfDay()->format('Y-m-d H:i:s');
-            $end = Date::parse($year . '-12-31')->endOfDay()->format('Y-m-d H:i:s');
+    public function getStartAndEndDates($year = null): array
+    {
+        if (request()->filled('start_date') && request()->filled('end_date')) {
+            $start = Date::parse(request('start_date'))->startOfDay();
+            $end = Date::parse(request('end_date'))->endOfDay();
         } else {
-            $start = $financial_start->startOfDay()->format('Y-m-d H:i:s');
-            $end = $financial_start->addYear(1)->subDays(1)->endOfDay()->format('Y-m-d H:i:s');
+            $financial_year = $this->getFinancialYear($year);
+
+            $start = $financial_year->copy()->getStartDate()->startOfDay();
+            $end = $financial_year->copy()->getEndDate()->endOfDay();
         }
 
-        return $query->whereBetween($field, [$start, $end]);
+        return [$start, $end];
     }
 
-    public function getTimezones()
+    /**
+     * The start of the financial year named after a year: the calendar year it starts in, or, when the financial
+     * year is denoted by its end, the one it ends in. With no year, the financial year that holds the date or today.
+     */
+    public function getFinancialStart($year = null, $date = null): Date
     {
-        $groups = [];
-
-        // The list of available timezone groups to use.
-        $use_zones = array('Africa', 'America', 'Antarctica', 'Arctic', 'Asia', 'Atlantic', 'Australia', 'Europe', 'Indian', 'Pacific');
-
-        // Get the list of time zones from the server.
-        $zones = \DateTimeZone::listIdentifiers();
-
-        // Build the group lists.
-        foreach ($zones as $zone) {
-            // Time zones not in a group we will ignore.
-            if (strpos($zone, '/') === false) {
-                continue;
-            }
-
-            // Get the group/locale from the timezone.
-            list ($group, $locale) = explode('/', $zone, 2);
-
-            // Only use known groups.
-            if (in_array($group, $use_zones)) {
-                // Initialize the group if necessary.
-                if (!isset($groups[$group])) {
-                    $groups[$group] = [];
-                }
-
-                // Only add options where a locale exists.
-                if (!empty($locale)) {
-                    $groups[$group][$zone] = str_replace('_', ' ', $locale);
-                }
-            }
+        if (is_null($year)) {
+            return $this->getFinancialStartOf(is_null($date) ? Date::now() : Date::parse($date));
         }
 
-        // Sort the group lists.
-        ksort($groups);
-
-        return $groups;
-    }
-
-    public function getFinancialStart($year = null)
-    {
-        $now = Date::now();
-        $start = Date::now()->startOfYear();
+        $start_of_year = Date::now()->startOfYear();
 
         $setting = explode('-', setting('localisation.financial_start'));
 
-        $day = !empty($setting[0]) ? $setting[0] : $start->day;
-        $month = !empty($setting[1]) ? $setting[1] : $start->month;
-        $year = $year ?? $this->getSearchStringValue('year', $now->year);
+        $day = ! empty($setting[0]) ? $setting[0] : $start_of_year->day;
+        $month = ! empty($setting[1]) ? $setting[1] : $start_of_year->month;
+        $year = $year ?? $start_of_year->year;
 
         $financial_start = Date::create($year, $month, $day);
-
-        if ((setting('localisation.financial_denote') == 'ends') && ($financial_start->dayOfYear != 1)) {
+        if ((setting('localisation.financial_denote') == 'ends') && ($financial_start->dayOfYear != 1) ||
+            $financial_start->greaterThan($date ?? Date::now())
+        ) {
             $financial_start->subYear();
         }
 
         return $financial_start;
     }
 
-    public function getFinancialYear($year = null)
+    /**
+     * The start of the financial year that holds a date. The calendar year of the date does not name that year
+     * when it is denoted by its end and starts after 1 January: on or past this calendar year's start, the date
+     * falls in the year named after the next calendar year, so the year after the named one is taken.
+     */
+    public function getFinancialStartOf(Date $date): Date
     {
-        $start = $this->getFinancialStart($year);
+        $start = $this->getFinancialStart($date->year, $date);
 
-        return CarbonPeriod::create($start, $start->copy()->addYear()->subDay()->endOfDay());
-    }
-
-    public function getFinancialQuarters($year = null)
-    {
-        $quarters = [];
-        $start = $this->getFinancialStart($year);
-
-        for ($i = 0; $i < 4; $i++) {
-            $quarters[] = CarbonPeriod::create($start->copy()->addQuarters($i), $start->copy()->addQuarters($i + 1)->subDay()->endOfDay());
+        if ($start->copy()->addYear()->lessThanOrEqualTo($date)) {
+            $start->addYear();
         }
 
-        return $quarters;
+        return $start;
     }
 
-    public function getDatePickerShortcuts()
+    /**
+     * The year the financial year that holds a date is named after, which getFinancialStart() and
+     * getFinancialYear() take: the calendar year it starts in, or the one it ends in when it is denoted by its end.
+     */
+    public function getFinancialYearName(Date $date): int
     {
-        $today = new Date();
-        $financial_year = $this->getFinancialYear();
-        $financial_quarters = $this->getFinancialQuarters();
+        $start = $this->getFinancialStartOf($date);
+
+        return (setting('localisation.financial_denote') == 'ends') ? $start->copy()->addYear()->subDay()->year : $start->year;
+    }
+
+    public function getFinancialWeek($year = null, $date = null): CarbonPeriod
+    {
+        $today = Date::today();
+        $financial_weeks = $this->getFinancialPeriodsOfYear('Weeks', 53, $year, $date);
+
+        foreach ($financial_weeks as $week) {
+            if ($today->lessThan($week->getStartDate()) || $today->greaterThan($week->getEndDate())) {
+                continue;
+            }
+
+            $this_week = $week;
+
+            break;
+        }
+
+        if (! isset($this_week)) {
+            $this_week = $financial_weeks[0];
+        }
+
+        return $this_week;
+    }
+
+    public function getFinancialMonth($year = null, $date = null): CarbonPeriod
+    {
+        $today = Date::today();
+        $financial_months = $this->getFinancialPeriodsOfYear('Months', 12, $year, $date);
+
+        foreach ($financial_months as $month) {
+            if ($today->lessThan($month->getStartDate()) || $today->greaterThan($month->getEndDate())) {
+                continue;
+            }
+
+            $this_month = $month;
+
+            break;
+        }
+
+        if (! isset($this_month)) {
+            $this_month = $financial_months[0];
+        }
+
+        return $this_month;
+    }
+
+    public function getFinancialQuarter($year = null, $date = null): CarbonPeriod
+    {
+        $today = Date::today();
+        $financial_quarters = $this->getFinancialPeriodsOfYear('Quarters', 4, $year, $date);
 
         foreach ($financial_quarters as $quarter) {
             if ($today->lessThan($quarter->getStartDate()) || $today->greaterThan($quarter->getEndDate())) {
-                $previous_quarter = $quarter;
-
                 continue;
             }
 
@@ -154,58 +167,270 @@ trait DateTime
             break;
         }
 
-        if (!isset($this_quarter)) {
+        if (! isset($this_quarter)) {
             $this_quarter = $financial_quarters[0];
         }
 
-        if (!isset($previous_quarter)) {
-            $previous_quarter = $financial_quarters[0];
+        return $this_quarter;
+    }
+
+    /**
+     * The weeks, months or quarters of a whole financial year, to find the one today falls in.
+     *
+     * Not getFinancialWeeks() and the like: they stop at the request's end date for the report columns, so a
+     * past window would leave today out and name its first period This Quarter, This Month or This Week.
+     */
+    protected function getFinancialPeriodsOfYear(
+        string $unit,
+        int $count,
+        $year = null,
+        $date = null,
+    ): array {
+        $start = $this->getFinancialStart($year, $date);
+
+        $periods = [];
+
+        $function = 'add' . $unit;
+
+        for ($i = 0; $i < $count; $i++) {
+            $periods[] = CarbonPeriod::create(
+                $start->copy()->{$function}($i),
+                $start->copy()->{$function}($i + 1)->subDay()->endOfDay(),
+            );
         }
 
+        return $periods;
+    }
+
+    public function getFinancialYear($year = null, $date = null): CarbonPeriod
+    {
+        $financial_start = $this->getFinancialStart($year, $date);
+
+        return CarbonPeriod::create($financial_start, $financial_start->copy()->addYear()->subDay()->endOfDay());
+    }
+
+    public function getFinancialWeeks($year = null, $date = null): array
+    {
+        $weeks = [];
+
+        $start = $this->getFinancialStart($year, $date);
+
+        $w = 52;
+
+        if (request()->filled('start_date') && request()->filled('end_date')) {
+            $w = Date::parse($start->copy())->diffInWeeks(Date::parse(request('end_date'))) + 1;
+        }
+
+        for ($i = 0; $i < $w; $i++) {
+            $weeks[] = CarbonPeriod::create($start->copy()->addWeeks($i), $start->copy()->addWeeks($i + 1)->subDay()->endOfDay());
+        }
+
+        return $weeks;
+    }
+
+    public function getFinancialMonths($year = null, $date = null): array
+    {
+        $months = [];
+
+        $start = $this->getFinancialStart($year, $date);
+
+        $m = 12;
+
+        if (request()->filled('start_date') && request()->filled('end_date')) {
+            $m = Date::parse($start->copy())->diffInMonths(Date::parse(request('end_date'))) + 1;
+        }
+
+        for ($i = 0; $i < $m; $i++) {
+            $months[] = CarbonPeriod::create($start->copy()->addMonths($i), $start->copy()->addMonths($i + 1)->subDay()->endOfDay());
+        }
+
+        return $months;
+    }
+
+    public function getFinancialQuarters($year = null, $date = null): array
+    {
+        $quarters = [];
+
+        $start = $this->getFinancialStart($year, $date);
+
+        $q = 4;
+
+        /*
+            Previously, diffInQuarters was calculated from start_date, which caused errors
+            when the financial start value differed from the default value.
+            Therefore, this change has been made. Ticket: #8106
+         */
+        if (request()->filled('start_date') && request()->filled('end_date')) {
+            $q = Date::parse($start->copy())->diffInQuarters(Date::parse(request('end_date'))) + 1;
+        }
+
+        for ($i = 0; $i < $q; $i++) {
+            $quarters[] = CarbonPeriod::create($start->copy()->addQuarters($i), $start->copy()->addQuarters($i + 1)->subDay()->endOfDay());
+        }
+
+        return $quarters;
+    }
+
+    public function getDatePickerShortcuts(): array
+    {
+        $today = Date::today();
+        $financial_week = $this->getFinancialWeek();
+        $financial_month = $this->getFinancialMonth();
+        $financial_quarter = $this->getFinancialQuarter();
+        $financial_year = $this->getFinancialYear();
+
         $date_picker_shortcuts = [
-            trans('reports.this_year') => [
-                'start' => $financial_year->getStartDate()->format('Y-m-d'),
-                'end' => $financial_year->getEndDate()->format('Y-m-d'),
+            trans('general.date_range.this_week') => [
+                'start' => $financial_week->copy()->getStartDate()->toDateString(),
+                'end' => $financial_week->copy()->getEndDate()->toDateString(),
             ],
-            trans('reports.previous_year') => [
-                'start' => $financial_year->getStartDate()->copy()->subYear()->format('Y-m-d'),
-                'end' => $financial_year->getEndDate()->copy()->subYear()->format('Y-m-d'),
+            trans('general.date_range.this_month') => [
+                'start' => $financial_month->copy()->getStartDate()->toDateString(),
+                'end' => $financial_month->copy()->getEndDate()->toDateString(),
             ],
-            trans('reports.this_quarter') => [
-                'start' => $this_quarter->getStartDate()->format('Y-m-d'),
-                'end' => $this_quarter->getEndDate()->format('Y-m-d'),
+            trans('general.date_range.this_quarter') => [
+                'start' => $financial_quarter->copy()->getStartDate()->toDateString(),
+                'end' => $financial_quarter->copy()->getEndDate()->toDateString(),
             ],
-            trans('reports.previous_quarter') => [
-                'start' => $previous_quarter->getStartDate()->format('Y-m-d'),
-                'end' => $previous_quarter->getEndDate()->format('Y-m-d'),
+            trans('general.date_range.this_year') => [
+                'start' => $financial_year->copy()->getStartDate()->toDateString(),
+                'end' => $financial_year->copy()->getEndDate()->toDateString(),
             ],
-            trans('reports.last_12_months') => [
-                'start' => $today->copy()->subYear()->startOfDay()->format('Y-m-d'),
-                'end' => $today->copy()->subDay()->endOfDay()->format('Y-m-d'),
+            trans('general.date_range.year_to_date') => [
+                'start' => $financial_year->copy()->getStartDate()->toDateString(),
+                'end' => $today->copy()->toDateString(),
+            ],
+            trans('general.date_range.previous_week') => [
+                'start' => $financial_week->copy()->getStartDate()->subWeek()->toDateString(),
+                'end' => $financial_week->copy()->getStartDate()->subDay()->toDateString(),
+            ],
+            trans('general.date_range.previous_month') => [
+                'start' => $financial_month->copy()->getStartDate()->subMonth()->toDateString(),
+                'end' => $financial_month->copy()->getStartDate()->subDay()->toDateString(),
+            ],
+            trans('general.date_range.previous_quarter') => [
+                'start' => $financial_quarter->copy()->getStartDate()->subQuarter()->toDateString(),
+                'end' => $financial_quarter->copy()->getStartDate()->subDay()->toDateString(),
+            ],
+            trans('general.date_range.previous_year') => [
+                'start' => $financial_year->copy()->getStartDate()->subYear()->toDateString(),
+                'end' => $financial_year->copy()->getStartDate()->subDay()->toDateString(),
             ],
         ];
 
         return $date_picker_shortcuts;
     }
 
-    public function getMonthlyDateFormat($year = null)
+    public function getDailyDateFormat(): string
     {
-        $format = 'M Y';
-
-        return $format;
+        return 'd M Y';
     }
 
-    public function getQuarterlyDateFormat($year = null)
+    public function getWeeklyDateFormat(): string
     {
-        $format = 'M Y';
-
-        return $format;
+        return 'W - M Y';
     }
 
-    public function getYearlyDateFormat()
+    public function getMonthlyDateFormat(): string
     {
-        $format = 'Y';
+        return 'M Y';
+    }
 
-        return $format;
+    public function getQuarterlyDateFormat(): string
+    {
+        return 'M Y';
+    }
+
+    public function getYearlyDateFormat(): string
+    {
+        return 'Y';
+    }
+
+    public function getPeriodicDate(Date $date, string $period, string $year): string
+    {
+        $formatted_date = '';
+
+        switch ($period) {
+            case 'yearly':
+                $financial_year = $this->getFinancialYear($year, $date);
+
+                if ($date->greaterThanOrEqualTo($financial_year->getStartDate()) && $date->lessThanOrEqualTo($financial_year->getEndDate())) {
+                    if (setting('localisation.financial_denote') == 'begins') {
+                        $formatted_date = $financial_year->copy()->getStartDate()->format($this->getYearlyDateFormat());
+                    } else {
+                        $formatted_date = $financial_year->copy()->getEndDate()->format($this->getYearlyDateFormat());
+                    }
+                }
+
+                break;
+            case 'quarterly':
+                $quarters = $this->getFinancialQuarters($year, $date);
+
+                foreach ($quarters as $quarter) {
+                    if ($date->lessThan($quarter->getStartDate()) || $date->greaterThan($quarter->getEndDate())) {
+                        continue;
+                    }
+
+                    $start = $quarter->copy()->getStartDate()->format($this->getQuarterlyDateFormat($year));
+                    $end = $quarter->copy()->getEndDate()->format($this->getQuarterlyDateFormat($year));
+
+                    $formatted_date = $start . ' - ' . $end;
+
+                    break;
+                }
+
+                break;
+            case 'weekly':
+                $weeks = $this->getFinancialWeeks($year, $date);
+
+                foreach ($weeks as $week) {
+                    if ($date->lessThan($week->getStartDate()) || $date->greaterThan($week->getEndDate())) {
+                        continue;
+                    }
+
+                    $start = $week->copy()->getStartDate()->format($this->getDailyDateFormat($year));
+                    $end = $week->copy()->getEndDate()->format($this->getDailyDateFormat($year));
+
+                    $formatted_date = $start . ' - ' . $end;
+
+                    break;
+                }
+
+                break;
+            default:
+                $formatted_date = $date->copy()->format($this->getMonthlyDateFormat($year));
+
+                break;
+        }
+
+        return $formatted_date;
+    }
+
+    public function getTimezones(): array
+    {
+        // The list of available timezone groups to use.
+        $use_zones = ['Africa', 'America', 'Antarctica', 'Arctic', 'Asia', 'Atlantic', 'Australia', 'Europe', 'Indian', 'Pacific'];
+
+        // Get the list of time zones from the server.
+        $zones = \DateTimeZone::listIdentifiers();
+
+        return collect($zones)
+                ->mapWithKeys(function ($timezone) use ($use_zones) {
+                    if (! in_array(str($timezone)->before('/'), $use_zones)) {
+                        return [];
+                    }
+
+                    return [$timezone => str($timezone)->after('/')->value()];
+                })
+                ->groupBy(function ($item, $key) {
+                    return str($key)->before('/')->value();
+                }, preserveKeys: true)
+                ->toArray();
+    }
+
+    // @deprecated 3.1
+    public function scopeMonthsOfYear($query, string $field)
+    {
+        return $this->scopeDateFilter($query, $field);
     }
 }

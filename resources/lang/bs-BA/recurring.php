@@ -3,9 +3,6 @@
 return [
 
     'recurring'             => 'Ponavljajuće',
-    'interval'              => 'Interval',
-    'frequency'             => 'Frekvencija',
-    'count'                 => 'Broj',
     'every'                 => 'Svakih',
     'period'                => 'Razdoblje',
     'times'                 => 'Puta',
@@ -18,8 +15,27 @@ return [
     'weeks'                 => 'Sedmice(a)',
     'months'                => 'Mjesec(i)',
     'years'                 => 'Godine(a)',
+    'frequency'             => 'Frekvencija',
+    'duration'              => 'Trajanje',
+    'last_issued'           => 'Zadnje izdavanje',
+    'after'                 => 'Nakon',
+    'on'                    => 'Uključeno',
+    'never'                 => 'Nikad',
+    'ends_after'            => 'Ističe nakon :times puta',
+    'ends_never'            => 'Nikad ne završi',
+    'ends_date'             => 'Završava :date',
+    'next_date'             => 'Slijedeći :date ',
+    'end'                   => 'Kraj ponavljanja',
+    'child'                 => ':url je automatski kreiran :date',
     'message'               => 'Ovo je ponavljajući :type i sljedeći :type će automatski biti generiran :date',
     'message_parent'        => 'Ovaj :type je automatski generisan ovdje :link',
-    'tooltip'               => 'Pored unapred definisanih perioda, moguće je prilagoditi i prilagođene periode u skladu sa zahtevima. <br><b>Savjet:</b> Brojač mora biti postavljen na nulu da bi se ponavljao beskonačno.',
+
+    'frequency_type'        => 'Ponovite ovo :type',
+    'limit_date'            => 'Kreirajte prvo :type',
+    'limit_middle'          => 'i kraj',
+
+    'form_description' => [
+        'schedule'          => 'Odaberite uslove i vrijeme početka/završetka kako biste osigurali da vaš kupac dobije vaš :type na ispravan dan.',
+    ],
 
 ];

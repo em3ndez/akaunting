@@ -48,7 +48,9 @@ class Updates extends Controller
                 $m->name = $row->getName();
                 $m->alias = $row->get('alias');
                 $m->installed = $row->get('version');
-                $m->latest = $updates[$alias];
+                $m->latest = $updates[$alias]->latest;
+                $m->errors = $updates[$alias]->errors;
+                $m->message = $updates[$alias]->message;
 
                 $modules[] = $m;
             }
@@ -98,6 +100,12 @@ class Updates extends Controller
             $name = $module->getName();
 
             $installed = $module->get('version');
+
+            if (version_compare($installed, $version, '>=')) {
+                flash(trans('modules.warning.latest_version', ['module' => $name]))->warning()->important();
+
+                return $this->check();
+            }
         }
 
         return view('install.updates.edit', compact('alias', 'name', 'installed', 'version'));
@@ -296,8 +304,6 @@ class Updates extends Controller
 
     /**
      * Redirect back
-     *
-     * @param  $request
      *
      * @return Response
      */

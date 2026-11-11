@@ -15,14 +15,12 @@ class DocumentItemColumns extends Controller
     public function __construct()
     {
         // Add CRUD permission check
-        $this->middleware('permission:read-settings-settings')->only('index', 'edit');
-        $this->middleware('permission:update-settings-settings')->only('update', 'enable', 'disable');
+        $this->middleware('permission:read-settings-invoice')->only('index', 'edit');
+        $this->middleware('permission:update-settings-invoice')->only('update', 'enable', 'disable');
     }
 
     /**
      * Show the form for editing the specified resource.
-     *
-     * @param  Contact  $customer
      *
      * @return Response
      */
@@ -31,50 +29,43 @@ class DocumentItemColumns extends Controller
         $type = request()->get('type', 'invoice');
 
         $item_names = [
-            'settings.invoice.item' => trans('settings.' . $type . '.item'),
-            'settings.invoice.product' => trans('settings.' . $type . '.product'),
-            'settings.invoice.service' =>  trans('settings.' . $type . '.service'),
+            'hide' => trans('settings.invoice.hide.item_name'),
+            'settings.invoice.item' => trans('settings.invoice.item'),
+            'settings.invoice.product' => trans('settings.invoice.product'),
+            'settings.invoice.service' =>  trans('settings.invoice.service'),
             'custom' => trans('settings.invoice.custom'),
         ];
 
         $price_names = [
-            'settings.invoice.price' => trans('settings.' . $type . '.price'),
-            'settings.invoice.rate' => trans('settings.' . $type . '.rate'),
+            'hide' => trans('settings.invoice.hide.price'),
+            'settings.invoice.price' => trans('settings.invoice.price'),
+            'settings.invoice.rate' => trans('settings.invoice.rate'),
             'custom' => trans('settings.invoice.custom'),
         ];
 
         $quantity_names = [
-            'settings.invoice.quantity' => trans('settings.' . $type . '.quantity'),
+            'hide' => trans('settings.invoice.hide.quantity'),
+            'settings.invoice.quantity' => trans('settings.invoice.quantity'),
             'custom' => trans('settings.invoice.custom'),
         ];
 
-        $payment_terms = [
-            '0' => trans('settings.invoice.due_receipt'),
-            '15' => trans('settings.invoice.due_days', ['days' => 15]),
-            '30' => trans('settings.invoice.due_days', ['days' => 30]),
-            '45' => trans('settings.invoice.due_days', ['days' => 45]),
-            '60' => trans('settings.invoice.due_days', ['days' => 60]),
-            '90' => trans('settings.invoice.due_days', ['days' => 90]),
-        ];
-
-        $item_name             = setting($this->getSettingKey($type, 'item_name'));
-        $item_name_input       = setting($this->getSettingKey($type, 'item_name_input'));
-        $price_name            = setting($this->getSettingKey($type, 'price_name'));
-        $price_name_input      = setting($this->getSettingKey($type, 'price_name_input'));
-        $quantity_name         = setting($this->getSettingKey($type, 'quantity_name'));
-        $quantity_name_input   = setting($this->getSettingKey($type, 'quantity_name_input'));
-        $hide_item_name        = setting($this->getSettingKey($type, 'hide_item_name'));
-        $hide_item_description = setting($this->getSettingKey($type, 'hide_item_description'));
-        $hide_quantity         = setting($this->getSettingKey($type, 'hide_quantity'));
-        $hide_price            = setting($this->getSettingKey($type, 'hide_price'));
-        $hide_amount           = setting($this->getSettingKey($type, 'hide_amount'));
+        $item_name             = setting($this->getDocumentSettingKey($type, 'item_name'));
+        $item_name_input       = setting($this->getDocumentSettingKey($type, 'item_name_input'));
+        $price_name            = setting($this->getDocumentSettingKey($type, 'price_name'));
+        $price_name_input      = setting($this->getDocumentSettingKey($type, 'price_name_input'));
+        $quantity_name         = setting($this->getDocumentSettingKey($type, 'quantity_name'));
+        $quantity_name_input   = setting($this->getDocumentSettingKey($type, 'quantity_name_input'));
+        $hide_item_name        = setting($this->getDocumentSettingKey($type, 'hide_item_name'));
+        $hide_item_description = setting($this->getDocumentSettingKey($type, 'hide_item_description'));
+        $hide_quantity         = setting($this->getDocumentSettingKey($type, 'hide_quantity'));
+        $hide_price            = setting($this->getDocumentSettingKey($type, 'hide_price'));
+        $hide_amount           = setting($this->getDocumentSettingKey($type, 'hide_amount'));
 
         $html = view('modals.documents.item_columns', compact(
             'type',
             'item_names',
             'price_names',
             'quantity_names',
-            'payment_terms',
             'item_name',
             'item_name_input',
             'price_name',
@@ -114,7 +105,7 @@ class DocumentItemColumns extends Controller
         }
 
         foreach ($fields as $key => $value) {
-            $real_key = $this->getSettingKey($type, $key);
+            $real_key = $this->getDocumentSettingKey($type, $key);
 
             // Don't process unwanted keys
             if (in_array($key, $this->skip_keys)) {

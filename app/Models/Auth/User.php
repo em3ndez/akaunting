@@ -2,11 +2,13 @@
 
 namespace App\Models\Auth;
 
-use App\Traits\Tenants;
+use Akaunting\Sortable\Traits\Sortable;
 use App\Notifications\Auth\Reset;
+use App\Traits\HasApiTokens;
 use App\Traits\Media;
 use App\Traits\Owners;
 use App\Traits\Sources;
+use App\Traits\Tenants;
 use App\Traits\Users;
 use App\Utilities\Date;
 use Illuminate\Contracts\Translation\HasLocalePreference;
@@ -14,13 +16,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Kyslik\ColumnSortable\Sortable;
 use Laratrust\Traits\LaratrustUserTrait;
 use Lorisleiva\LaravelSearchString\Concerns\SearchString;
+use Staudenmeir\EloquentHasManyDeep\HasRelationships;
 
 class User extends Authenticatable implements HasLocalePreference
 {
-    use HasFactory, LaratrustUserTrait, Media, Notifiable, Owners, SearchString, SoftDeletes, Sortable, Sources, Tenants, Users;
+    use HasApiTokens, HasFactory, HasRelationships, LaratrustUserTrait, Media, Notifiable, Owners, SearchString, SoftDeletes, Sortable, Sources, Tenants, Users;
 
     protected $table = 'users';
 
@@ -37,7 +39,11 @@ class User extends Authenticatable implements HasLocalePreference
      * @var array
      */
     protected $casts = [
-        'enabled' => 'boolean',
+        'enabled'           => 'boolean',
+        'last_logged_in_at' => 'datetime',
+        'created_at'        => 'datetime',
+        'updated_at'        => 'datetime',
+        'deleted_at'        => 'datetime',
     ];
 
     /**
@@ -46,13 +52,6 @@ class User extends Authenticatable implements HasLocalePreference
      * @var array
      */
     protected $hidden = ['password', 'remember_token'];
-
-    /**
-     * The attributes that should be mutated to dates.
-     *
-     * @var array
-     */
-    protected $dates = ['last_logged_in_at', 'created_at', 'updated_at', 'deleted_at'];
 
     /**
      * Sortable columns.
@@ -65,11 +64,11 @@ class User extends Authenticatable implements HasLocalePreference
     {
         parent::boot();
 
-        static::retrieved(function($model) {
+        static::retrieved(function ($model) {
             $model->setCompanyIds();
         });
 
-        static::saving(function($model) {
+        static::saving(function ($model) {
             $model->unsetCompanyIds();
         });
     }
@@ -89,11 +88,25 @@ class User extends Authenticatable implements HasLocalePreference
         return $this->belongsToMany('App\Models\Common\Dashboard', 'App\Models\Auth\UserDashboard');
     }
 
+    public function invitation()
+    {
+        return $this->hasOne('App\Models\Auth\UserInvitation', 'user_id', 'id');
+    }
+
+    public function roles()
+    {
+        return $this->belongsToMany(role_model_class(), 'App\Models\Auth\UserRole');
+    }
+
     /**
      * Always capitalize the name when we retrieve it
      */
     public function getNameAttribute($value)
     {
+        if (empty($value)) {
+            return trans('general.na');
+        }
+
         return ucfirst($value);
     }
 
@@ -106,9 +119,9 @@ class User extends Authenticatable implements HasLocalePreference
         if (setting('default.use_gravatar', '0') == '1') {
             try {
                 // Check for gravatar
-                $url = 'https://www.gravatar.com/avatar/' . md5(strtolower($this->getAttribute('email'))).'?size=90&d=404';
+                $url = 'https://www.gravatar.com/avatar/' . md5(strtolower($this->getAttribute('email'))) . '?size=90&d=404';
 
-                $client = new \GuzzleHttp\Client(['verify' => false]);
+                $client = new \GuzzleHttp\Client(['verify' => \Composer\CaBundle\CaBundle::getSystemCaRootBundlePath()]);
 
                 $client->request('GET', $url)->getBody()->getContents();
 
@@ -120,7 +133,7 @@ class User extends Authenticatable implements HasLocalePreference
 
         if (!empty($value)) {
             return $value;
-        } elseif (!$this->hasMedia('picture')) {
+        } elseif (! $this->hasMedia('picture')) {
             return false;
         }
 
@@ -142,14 +155,6 @@ class User extends Authenticatable implements HasLocalePreference
     }
 
     /**
-     * Send reset link to user via email
-     */
-    public function sendPasswordResetNotification($token)
-    {
-        $this->notify(new Reset($token));
-    }
-
-    /**
      * Always capitalize the name when we save it to the database
      */
     public function setNameAttribute($value)
@@ -166,6 +171,14 @@ class User extends Authenticatable implements HasLocalePreference
     }
 
     /**
+     * Send reset link to user via email
+     */
+    public function sendPasswordResetNotification($token)
+    {
+        $this->notify(new Reset($token, $this->email));
+    }
+
+    /**
      * Scope to get all rows filtered, sorted and paginated.
      *
      * @param \Illuminate\Database\Eloquent\Builder $query
@@ -176,11 +189,22 @@ class User extends Authenticatable implements HasLocalePreference
     public function scopeCollect($query, $sort = 'name')
     {
         $request = request();
-
         $search = $request->get('search');
-        $limit = (int) $request->get('limit', setting('default.list_limit', '25'));
 
-        return $query->usingSearchString($search)->sortable($sort)->paginate($limit);
+        /**
+         * Modules that use the sort parameter in CRUD operations cause an error,
+         * so this sort parameter set back to old value after the query is executed.
+         *
+         * for Custom Fields module
+         */
+        $request_sort = $request->get('sort');
+
+        $query->usingSearchString($search)->sortable($sort);
+
+        $request->merge(['sort' => $request_sort]);
+        // This line disabled because broken sortable issue.
+        //$request->offsetUnset('direction');
+        return $query->paginate(list_limit());
     }
 
     /**
@@ -214,6 +238,33 @@ class User extends Authenticatable implements HasLocalePreference
     public function scopeIsNotCustomer($query)
     {
         return $query->wherePermissionIs('read-admin-panel');
+    }
+
+    /**
+     * Scope to only employees.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeIsEmployee($query)
+    {
+        return $query->whereHasRole('employee');
+    }
+
+    /**
+     * Scope to only users.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeIsNotEmployee($query)
+    {
+        return $query->wherePermissionIs('read-admin-panel');
+    }
+
+    public function scopeEmail($query, $email)
+    {
+        return $query->where('email', '=', $email);
     }
 
     /**
@@ -260,6 +311,26 @@ class User extends Authenticatable implements HasLocalePreference
         return (bool) $this->can('read-admin-panel');
     }
 
+    /**
+     * Determine if user is a employee.
+     *
+     * @return bool
+     */
+    public function isEmployee()
+    {
+        return (bool) $this->hasRole('employee');
+    }
+
+    /**
+     * Determine if user is not a employee.
+     *
+     * @return bool
+     */
+    public function isNotEmployee()
+    {
+        return (bool) ! $this->hasRole('employee');
+    }
+
     public function scopeSource($query, $source)
     {
         return $query->where($this->qualifyColumn('created_from'), $source);
@@ -292,6 +363,63 @@ class User extends Authenticatable implements HasLocalePreference
     public function preferredLocale()
     {
         return $this->locale;
+    }
+
+    /**
+     * Get the line actions.
+     *
+     * @return array
+     */
+    public function getLineActionsAttribute()
+    {
+        $actions = [];
+
+        $actions[] = [
+            'title' => trans('general.show'),
+            'icon' => 'visibility',
+            'url' => route('users.show', $this->id),
+            'permission' => 'read-auth-users',
+            'attributes' => [
+                'id' => 'index-line-actions-show-user-' . $this->id,
+            ],
+        ];
+
+        $actions[] = [
+            'title' => trans('general.edit'),
+            'icon' => 'edit',
+            'url' => route('users.edit', $this->id),
+            'permission' => 'update-auth-users',
+            'attributes' => [
+                'id' => 'index-line-actions-edit-user-' . $this->id,
+            ],
+        ];
+
+        if ($this->hasPendingInvitation()) {
+            $actions[] = [
+                'title' => trans('general.resend') . ' ' . trans_choice('general.invitations', 1),
+                'icon' => 'replay',
+                'url' => route('users.invite', $this->id),
+                'permission' => 'update-auth-users',
+                'attributes' => [
+                    'id' => 'index-line-actions-resend-user-' . $this->id,
+                ],
+            ];
+        }
+
+        if (user()->id != $this->id) {
+            $actions[] = [
+                'type' => 'delete',
+                'icon' => 'delete',
+                'route' => 'users.destroy',
+                'permission' => 'delete-auth-users',
+                'attributes' => [
+                    'id' => 'index-line-actions-delete-user-' . $this->id,
+                ],
+                'model' => $this,
+            ];
+        }
+
+        return $actions;
     }
 
     /**

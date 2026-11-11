@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -48,8 +49,8 @@ class Installer
             $requirements[] = trans('install.requirements.enabled', ['feature' => 'proc_close']);
         }
 
-        if (!class_exists('PDO')) {
-            $requirements[] = trans('install.requirements.extension', ['extension' => 'MySQL PDO']);
+        if ($db_driver_error = static::checkDbDriver()) {
+            $requirements[] = $db_driver_error;
         }
 
         if (!extension_loaded('bcmath')) {
@@ -70,6 +71,10 @@ class Installer
 
         if (!extension_loaded('fileinfo')) {
             $requirements[] = trans('install.requirements.extension', ['extension' => 'FileInfo']);
+        }
+
+        if (!extension_loaded('intl')) {
+            $requirements[] = trans('install.requirements.extension', ['extension' => 'Intl']);
         }
 
         if (!extension_loaded('gd')) {
@@ -124,12 +129,29 @@ class Installer
     }
 
     /**
+     * Check if PHP can talk to the configured database.
+     *
+     * @return string|null The error message, if the PDO driver of the connection is missing.
+     */
+    public static function checkDbDriver()
+    {
+        $connection = config('database.default', 'mysql');
+        $driver = config("database.connections.$connection.driver", $connection);
+
+        if (class_exists('PDO') && in_array($driver, DB::availableDrivers())) {
+            return null;
+        }
+
+        return trans('install.requirements.extension', ['extension' => 'pdo_' . $driver]);
+    }
+
+    /**
      * Create a default .env file.
      *
      * @return void
      */
-	public static function createDefaultEnvFile()
-	{
+    public static function createDefaultEnvFile()
+    {
         // Rename file
         if (!is_file(base_path('.env')) && is_file(base_path('.env.example'))) {
             File::move(base_path('.env.example'), base_path('.env'));
@@ -139,7 +161,7 @@ class Installer
         static::updateEnv([
             'APP_KEY' => 'base64:'.base64_encode(random_bytes(32)),
         ]);
-	}
+    }
 
     public static function createDbTables($host, $port, $database, $username, $password, $prefix = null)
     {
@@ -151,7 +173,7 @@ class Installer
         static::saveDbVariables($host, $port, $database, $username, $password, $prefix);
 
         // Try to increase the maximum execution time
-        set_time_limit(300); // 5 minutes
+        set_time_limit(900); // 15 minutes, same as the update flow
 
         // Create tables
         Artisan::call('migrate', ['--force' => true]);
@@ -190,6 +212,9 @@ class Installer
         try {
             DB::connection('install_test')->getPdo();
         } catch (\Exception $e) {
+            // Only the message, the arguments in the stack trace can hold the password
+            Log::error('Installer could not connect to the database: ' . $e->getMessage());
+
             return false;
         }
 
@@ -201,7 +226,7 @@ class Installer
 
     public static function saveDbVariables($host, $port, $database, $username, $password, $prefix = null)
     {
-        $prefix = !is_null($prefix) ? $prefix : strtolower(Str::random(3) . '_');
+        $prefix = !empty($prefix) ? $prefix : strtolower(Str::random(3) . '_');
 
         // Update .env file
         static::updateEnv([
@@ -209,7 +234,7 @@ class Installer
             'DB_PORT'       =>  $port,
             'DB_DATABASE'   =>  $database,
             'DB_USERNAME'   =>  $username,
-            'DB_PASSWORD'   =>  '"' . $password . '"',
+            'DB_PASSWORD'   =>  $password,
             'DB_PREFIX'     =>  $prefix,
         ]);
 
@@ -219,6 +244,17 @@ class Installer
         $db = Config::get('database.connections.' . $con);
 
         $db['host'] = $host;
+        $db['port'] = $port;
+
+        // Only mysql and mariadb split reads from writes, and there the split
+        // takes precedence over the host above. Adding these keys to a driver
+        // that has none would turn it into a read/write connection for no
+        // reason, so leave those connections alone.
+        if (isset($db['read'], $db['write'])) {
+            $db['read']['host'] = [$host];
+            $db['write']['host'] = [$host];
+        }
+
         $db['database'] = $database;
         $db['username'] = $username;
         $db['password'] = $password;
@@ -293,12 +329,14 @@ class Installer
         foreach ($data as $data_key => $data_value) {
             $updated = false;
 
+            $line = $data_key . '=' . static::formatEnvValue($data_value);
+
             foreach ($env as $env_key => $env_value) {
                 $entry = explode('=', $env_value, 2);
 
                 // Check if new or old key
                 if ($entry[0] == $data_key) {
-                    $env[$env_key] = $data_key . '=' . $data_value;
+                    $env[$env_key] = $line;
                     $updated = true;
                 } else {
                     $env[$env_key] = $env_value;
@@ -307,7 +345,7 @@ class Installer
 
             // Lets create if not available
             if (!$updated) {
-                $env[] = $data_key . '=' . $data_value;
+                $env[] = $line;
             }
         }
 
@@ -316,5 +354,26 @@ class Installer
         file_put_contents(base_path('.env'), $env);
 
         return true;
+    }
+
+    /**
+     * Format a raw value for a .env line.
+     *
+     * Plain values are written as they are. Anything else is double quoted, with
+     * line breaks flattened and \, " and $ escaped, so the value can neither end
+     * its line and append keys (dotenv keeps the last duplicate) nor expand
+     * another variable such as ${APP_KEY}.
+     */
+    public static function formatEnvValue($value): string
+    {
+        $value = (string) $value;
+
+        if (preg_match('/\A[\w.,:\/@+=%~-]*\z/', $value)) {
+            return $value;
+        }
+
+        $value = str_replace(["\r\n", "\r", "\n"], ' ', $value);
+
+        return '"' . str_replace(['\\', '"', '$'], ['\\\\', '\\"', '\\$'], $value) . '"';
     }
 }

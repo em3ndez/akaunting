@@ -20,4 +20,7 @@ return [
         'unreconcile'   => 'Vai tiešām vēlaties <b>nesaskaņot</b> atlasīto ierakstu?|Vai tiešām vēlaties  <b>nesaskaņot </b> atlasītos ierakstus?',
     ],
 
+    'success' => [
+        'general'       => ':count ierakstus :type.',
+    ],
 ];

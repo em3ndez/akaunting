@@ -2,12 +2,16 @@
 
 namespace App\Utilities;
 
+use App\Events\Report\ClassesCreated as ReportClassesCreated;
 use App\Models\Common\Report;
 use App\Models\Module\Module;
+use App\Traits\Modules;
 use Illuminate\Support\Str;
 
 class Reports
 {
+    use Modules;
+
     public static function getClasses($check_permission = true)
     {
         $classes = [];
@@ -18,20 +22,28 @@ class Reports
             'App\Reports\IncomeExpenseSummary',
             'App\Reports\TaxSummary',
             'App\Reports\ProfitLoss',
+            'App\Reports\DiscountSummary',
         ];
 
         Module::enabled()->each(function ($module) use (&$list) {
             $m = module($module->alias);
 
-            if (!$m || empty($m->get('reports'))) {
+            if (! $m || $m->disabled() || empty($m->get('reports'))) {
                 return;
             }
 
             $list = array_merge($list, (array) $m->get('reports'));
         });
 
+        // Added New Event
+        $report_classes = collect($list);
+
+        event(new ReportClassesCreated($report_classes));
+
+        $list = $report_classes->all();
+
         foreach ($list as $class) {
-            if (!class_exists($class) || ($check_permission && !static::canRead($class))) {
+            if (! class_exists($class) || ($check_permission && static::cannotRead($class))) {
                 continue;
             }
 
@@ -47,7 +59,13 @@ class Reports
             $model = Report::where('class', $model)->first();
         }
 
-        if ((!$model instanceof Report) || !class_exists($model->class)) {
+        if ((! $model instanceof Report) || ! class_exists($model->class)) {
+            return false;
+        }
+
+        // Use the static cache from isModuleEnabled() instead of creating
+        // a new instance and re-reading module JSON from disk each time.
+        if (! empty($model) && ($model->alias != 'core') && ! static::isModuleEnabled($model->class)) {
             return false;
         }
 
@@ -61,9 +79,19 @@ class Reports
         return (static::isModuleEnabled($class) && static::canRead($class));
     }
 
+    public static function cannotShow($class)
+    {
+        return ! static::canShow($class);
+    }
+
     public static function canRead($class)
     {
         return user()->can(static::getPermission($class));
+    }
+
+    public static function cannotRead($class)
+    {
+        return ! static::canRead($class);
     }
 
     public static function getPermission($class)
@@ -93,15 +121,22 @@ class Reports
 
     public static function isModuleEnabled($class)
     {
-        if (!$alias = static::getModuleAlias($class)) {
+        if (! $alias = static::getModuleAlias($class)) {
             return true;
         }
 
-        if (Module::alias($alias)->enabled()->first()) {
-            return true;
+        static $cache = [];
+
+        if (! array_key_exists($alias, $cache)) {
+            $cache[$alias] = module_is_enabled($alias);
         }
 
-        return false;
+        return $cache[$alias];
+    }
+
+    public static function isModuleDisabled($class)
+    {
+        return ! static::isModuleEnabled($class);
     }
 
     public static function isModule($class)
@@ -111,9 +146,14 @@ class Reports
         return (strtolower($arr[0]) == 'modules');
     }
 
+    public static function isNotModule($class)
+    {
+        return ! static::isModule($class);
+    }
+
     public static function getModuleAlias($class)
     {
-        if (!static::isModule($class)) {
+        if (static::isNotModule($class)) {
             return false;
         }
 

@@ -1,397 +1,415 @@
 <template>
-    <div>
-        <h1 class="text-white">
-            {{ translations.company.title }}
-        </h1>
+    <div class="relative bg-body z-10 rounded-lg shadow-2xl p-5 sm:p-10 full-height-mobile" style="height:675px;">
+        <WizardSteps :active_state="active"></WizardSteps>
 
-        <div class="card">
-            <div class="card-header wizard-header p-3">
-                <el-steps :active="active" finish-status="success" align-center>
-                    <el-step :title="translations.company.title"></el-step>
-                    <el-step :title="translations.currencies.title"></el-step>
-                    <el-step :title="translations.taxes.title"></el-step>
-                    <el-step :title="translations.finish.title"></el-step>
-                </el-steps>
+        <div class="flex flex-col justify-between -mt-5 sm:mt-0" style="height: calc(100% - 53px)">
+            <div v-if="pageLoad" class="absolute inset-0 w-full h-full bg-white rounded-lg flex items-center justify-center z-50">
+                <span class="material-icons form-spin animate-spin text-9xl">data_usage</span>
             </div>
 
-            <form ref="form" class="w-100 mb-0">
-                <div class="card-body">
-                    <div class="document-loading" v-if="pageLoad">
-                        <div>
-                            <i class="fas fa-spinner fa-pulse fa-7x"></i>
+            <div class="flex items-start gap-2 px-3 py-2 rounded-lg bg-orange-100 text-orange-700 text-sm leading-relaxed mb-2 -mt-2">
+                <span class="material-icons text-base flex-shrink-0 mt-0.5">warning</span>
+                <span>{{ company.country ? translations.company.country_immutable : translations.company.country_warning }}</span>
+            </div>
+
+            <div class="overflow-x-visible overflow-y-auto menu-scroll">
+                <form ref="form" class="py-2 align-middle inline-block min-w-full">
+                    <div class="relative">
+                        <div v-if="pageLoad" class="absolute left-0 right-0 top-0 bottom-0 w-full h-full bg-white rounded-lg flex items-center justify-center z-50">
+                            <span class="material-icons form-spin animate-spin text-9xl">data_usage</span>
                         </div>
-                    </div>
 
-                    <div class="row mb-0">
-                        <div class="col-12 mb-4">
-                            <base-input
-                                :label="translations.company.api_key"
-                                name="api_key"
-                                data-name="api_key"
-                                :placeholder="translations.company.api_key"
-                                prepend-icon="fas fa-key"
-                                v-model="company.api_key"
-                            />
+                        <div class="flex flex-col justify-between -mt-5 sm:mt-0">
+                            <div class="grid sm:grid-cols-6 gap-x-8 gap-y-6 my-3.5 menu-scroll gap-10">
+                                <div class="sm:col-span-6 -mt-2">
+                                    <base-input
+                                        not-required
+                                        :label="translations.company.api_key"
+                                        name="api_key"
+                                        data-name="api_key"
+                                        :placeholder="translations.company.api_key"
+                                        v-model="company.api_key"
+                                        :error="onFailErrorGet('api_key')"
+                                    />
 
-                            <p class="mb-0 mt--3">
-                                <small>
-                                    <div>
-                                        <a href="https://akaunting.com/dashboard" target="_blank">Click here</a>
-                                        to get your API key.
+                                    <div class="mt-2">
+                                        <small>
+                                            <a href="https://akaunting.com/dashboard" class="text-green" target="_blank">Click here</a>
+                                                to get your API key.
+                                        </small>
                                     </div>
-                                </small>
-                            </p>
-                        </div>
+                                </div>
 
-                        <div class="col-6">
-                            <base-input
-                                type="text"
-                                :label="translations.company.tax_number"
-                                name="tax_number"
-                                data-name="tax_number"
-                                :placeholder="translations.company.tax_number"
-                                prepend-icon="fas fa-percent"
-                                v-model="company.tax_number"
-                            />
-                        </div>
+                                <div class="sm:col-span-3 -mt-2">
+                                    <base-input
+                                        not-required
+                                        type="text"
+                                        :label="translations.company.tax_number"
+                                        name="tax_number"
+                                        data-name="tax_number"
+                                        :placeholder="translations.company.tax_number"
+                                        v-model="company.tax_number"
+                                        :error="onFailErrorGet('tax_number')"
+                                    />
+                                </div>
 
-                        <div class="col-6">
-                            <akaunting-date
-                            :title="translations.company.financial_start"
-                                data-name="financial_start"
-                                :placeholder="translations.company.financial_start"
-                                icon="fas fa-calendar"
-                                :date-config="{
-                                  dateFormat: 'd-m',
-                                  allowInput: false,
-                                  altInput: true,
-                                  altFormat: 'j F'
-                                }"
-                                v-model="real_date"
-                            ></akaunting-date>
-                        </div>
+                                <div class="sm:col-span-3 -mt-2">
+                                    <akaunting-date
+                                        not-required 
+                                        :title="translations.company.financial_start"
+                                        data-name="financial_start"
+                                        :placeholder="translations.company.financial_start"
+                                        icon="calendar_today"
+                                        :date-config="{
+                                            dateFormat: 'd-m',
+                                            allowInput: false,
+                                            altInput: true,
+                                            altFormat: 'j F'
+                                        }"
+                                        v-model="company.financial_start"
+                                        :form-error="onFailErrorGet('financial_start')"
+                                    ></akaunting-date>
+                                </div>
 
-                        <div class="col-12">
-                            <base-input :label="translations.company.address">
-                                <textarea
-                                    class="form-control"
-                                    name="address"
-                                    data-name="address"
-                                    rows="3"
-                                    :placeholder="translations.company.address"
-                                    v-model="company.address"
-                                ></textarea>
-                            </base-input>
-                        </div>
+                                <div class="sm:col-span-3 grid gap-y-4 -mt-2">
+                                    <div class="sm:col-span-3">
+                                        <base-input not-required :label="translations.company.address" :error="onFailErrorGet('address')">
+                                            <textarea class="w-full text-sm px-3 py-2.5 mt-1 rounded-lg border border-light-gray text-black placeholder-light-gray bg-white disabled:bg-gray-200 focus:outline-none focus:ring-transparent focus:border-purple" name="address" data-name="address" rows="3" :placeholder="translations.company.address" v-model="company.address"></textarea>
+                                        </base-input>
+                                    </div>
 
-                        <div class="col-6">
-                            <base-input :label="translations.company.country">
-                                <el-select v-model="company.country" filterable>
-                                    <template slot="prefix">
-                                        <span class="el-input__suffix-inner el-select-icon">
-                                            <i :class="'select-icon-position el-input__icon fas fa-globe-americas'"></i>
-                                        </span>
-                                    </template>
-                                    <el-option
-                                        v-for="(country, index) in sortedCountries"
-                                        :key="index"
-                                        :label="country.value"
-                                        :value="country.key"
-                                    >
-                                    </el-option>
-                                </el-select>
-                            </base-input>
+                                    <div class="sm:col-span-3">
+                                        <base-input :label="translations.company.country" :error="onFailErrorGet('country')">
+                                            <el-select v-model="company.country" filterable :disabled="country">
+                                                <el-option
+                                                    v-for="(country, index) in sortedCountries"
+                                                    :key="index"
+                                                    :label="country.value"
+                                                    :value="country.key"
+                                                >
+                                                </el-option>
+                                            </el-select>
+                                        </base-input>
 
-                            <input name="country" type="hidden" class="d-none" v-model="company.country"></input>
-                        </div>
+                                        <input name="country" type="hidden" class="d-none" v-model="company.country">
+                                    </div>
+                                </div>
 
-                        <div class="col-6 mb-0">
-                            <label class="form-control-label">{{  translations.company.logo }}</label>
-                            <akaunting-dropzone-file-upload
-                                ref="dropzoneWizard"
-                                class="form-file"
-                                preview-classes="single"
-                                :attachments="logo"
-                                :v-model="logo"
-                            >
-                            </akaunting-dropzone-file-upload>
+                                <div class="sm:col-span-3 -mt-2">
+                                    <label class="text-black text-sm font-medium">
+                                        {{  translations.company.logo }}
+                                    </label>
+
+                                    <akaunting-dropzone-file-upload ref="dropzoneWizard" class="form-file dropzone-column" style="width: 10.8rem; height: 10.8rem;" preview-classes="single" :attachments="logo" :resize-options="{ maxWidth: 1000, maxHeight: 1000, crop: true, aspectRatio: 1 }" :v-model="logo" @crop-state="logoCropProcessing = $event" :text-cancel-crop="translations.company.crop_cancel" :text-apply-crop="translations.company.crop_apply">
+                                    </akaunting-dropzone-file-upload>
+
+                                    <div v-if="onFailErrorGet('logo')" class="text-red text-sm mt-1 block" v-html="onFailErrorGet('logo')"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </form>
+            </div>
 
-                <div class="card-footer">
-                    <div class="row">
-                        <div class="col-md-12 text-right">
-                            <base-button
-                                id="button"
-                                type="success"
-                                native-type="button"
-                                @click="onEditSave()"
-                                >{{ translations.company.save }}</base-button>
+            <div class="flex items-center justify-center mt-5 gap-x-10">
+                <base-button class="w-1/2  flex items-center justify-center px-6 py-1.5 text-base rounded-lg bg-transparent hover:bg-gray-100" @click="next()">
+                    {{ translations.company.skip }}
+                </base-button>
 
-                            <base-button type="white" native-type="submit" @click="next()">{{ translations.company.skip }}</base-button>
-                        </div>
-                    </div>
-                </div>
-            </form>
+                <button
+                    type="submit"
+                    id="button"
+                    :disabled="button_loading_company || logoCropProcessing"
+                    class="w-1/2 relative flex items-center justify-center bg-green hover:bg-green-700 text-white px-6 py-1.5 text-base rounded-lg disabled:bg-green-100"
+                    @click="onEditSave($event)"
+                >
+                    <i v-if="button_loading_company" class="animate-submit delay-[0.28s] absolute w-2 h-2 rounded-full left-0 right-0 -top-3.5 m-auto before:absolute before:w-2 before:h-2 before:rounded-full before:animate-submit before:delay-[0.14s] after:absolute after:w-2 after:h-2 after:rounded-full after:animate-submit before:-left-3.5 after:-right-3.5 after:delay-[0.42s]"></i> 
+                    <span :class="[{'opacity-0': button_loading_company}]">
+                        {{ translations.company.save }}
+                    </span>
+                </button>
+            </div>
         </div>
-  </div>
+
+        <form id="form-dynamic-component" method="POST" action="#"></form>
+
+        <component v-bind:is="component" @deleted="onDeleteCurrency($event)"></component>
+
+        <notifications></notifications>
+    </div>
 </template>
 
 <script>
-import { Step, Steps, Select, Option } from "element-ui";
-import AkauntingDropzoneFileUpload from "./../../components/AkauntingDropzoneFileUpload";
-import AkauntingDate from "./../../components/AkauntingDate";
-import WizardAction from "./../../mixins/wizardAction";
+    import { Select, Option } from "element-ui";
+    import AkauntingDropzoneFileUpload from "./../../components/AkauntingDropzoneFileUpload";
+    import AkauntingDate from "./../../components/AkauntingDate";
+    import WizardAction from "./../../mixins/wizardAction";
+    import WizardSteps from "./Steps.vue";
 
-export default {
-    name: "Company",
+    export default {
+        name: "Company",
 
-    mixins: [WizardAction],
+        mixins: [
+            WizardAction
+        ],
 
-    components: {
-        [Step.name]: Step,
-        [Steps.name]: Steps,
-        [Select.name]: Select,
-        [Option.name]: Option,
-        AkauntingDropzoneFileUpload,
-        AkauntingDate,
-    },
-
-    props: {
-        company: {
-            type: [Object, Array],
+        components: {
+            [Select.name]: Select,
+            [Option.name]: Option,
+            AkauntingDropzoneFileUpload,
+            AkauntingDate,
+            WizardSteps
         },
 
-        countries: {
-            type: [Object, Array],
-        },
-
-        translations: {
-            type: [Object, Array],
-        },
-
-        url: {
-            type: String,
-            default: "text",
-        },
-
-        pageLoad: {
-          type: [Boolean, String]
-        },
-
-        locale: {
-            type: String,
-        },
-
-        dateConfig: {
-            type: Object,
-            default: function () {
-                return {
-
-                };
+        props: {
+            company: {
+                type: [Object, Array],
             },
-            description: "FlatPckr date configuration"
+
+            countries: {
+                type: [Object, Array],
+            },
+
+            translations: {
+                type: [Object, Array],
+            },
+
+            url: {
+                type: String,
+                default: "text",
+            },
+
+            pageLoad: {
+                type: [Boolean, String]
+            },
+
+            locale: {
+                type: String,
+            },
+
+            dateConfig: {
+                type: Object,
+                default: function () {
+                    return {
+                    };
+                },
+                description: "FlatPckr date configuration"
+            },
         },
-    },
 
-    data() {
-        return {
-            active: 0,
-            logo: [],
-            real_date: "",
-            lang_data: '',
-            sorted_countries: [],
-        };
-    },
+        data() {
+            return {
+                active: 0,
+                logo: [],
+                real_date: "",
+                lang_data: '',
+                sorted_countries: [],
+                button_loading_company: false,
+                logoCropProcessing: false,
+                country: false
+            };
+        },
 
-    created() {
-        if (document.documentElement.lang) {
-            let lang_split = document.documentElement.lang.split("-");
+        created() {
+            if (document.documentElement.lang) {
+                let lang_split = document.documentElement.lang.split("-");
 
-            if (lang_split[0] !== 'en') {
-                const lang = require(`flatpickr/dist/l10n/${lang_split[0]}.js`).default[lang_split[0]];
+                if (lang_split[0] !== 'en') {
+                    const lang = require(`flatpickr/dist/l10n/${lang_split[0]}.js`).default[lang_split[0]];
 
-                this.dateConfig.locale = lang;
+                    this.dateConfig.locale = lang;
+                }
             }
-        }
 
-        this.setSortedCountries();
-    },
-
-    computed: {
-        sortedCountries() {
-            this.sorted_countries.sort(this.sortBy('value'));
-
-            return this.sorted_countries;
+            this.setSortedCountries();
         },
-    },
 
-    mounted() {
-        let company_data = this.company;
+        computed: {
+            sortedCountries() {
+                this.sorted_countries.sort(this.sortBy('value'));
 
-        this.onDataWatch(company_data);
-    },
+                return this.sorted_countries;
+            },
+        },
 
-    methods: {
-        sortBy(option) {
-            return (firstEl, secondEl) => {
-                let first_element = firstEl[option].toUpperCase(); // ignore upper and lowercase
-                let second_element = secondEl[option].toUpperCase(); // ignore upper and lowercase
+        mounted() {
+            let company_data = this.company;
+            this.country = Boolean(company_data.country);
 
-                if (first_element < second_element) {
-                    return -1;
+            this.onDataWatch(company_data);
+        },
+
+        methods: {
+            sortBy(option) {
+                return (firstEl, secondEl) => {
+                    let first_element = firstEl[option].toUpperCase(); // ignore upper and lowercase
+                    let second_element = secondEl[option].toUpperCase(); // ignore upper and lowercase
+
+                    if (first_element < second_element) {
+                        return -1;
+                    }
+
+                    if (first_element > second_element) {
+                        return 1;
+                    }
+
+                    // names must be equal
+                    return 0;
+                }
+            },
+
+            setSortedCountries() {
+                // Reset sorted_countries
+                this.sorted_countries = [];
+
+                let created_options = this.countries;
+
+                // Option set sort_option data
+                if (!Array.isArray(created_options)) {
+                    for (const [key, value] of Object.entries(created_options)) {
+                        this.sorted_countries.push({
+                            key: key.toString(),
+                            value: value
+                        });
+                    }
+                } else {
+                    created_options.forEach(function (option, index) {
+                        if (typeof(option) == 'string') {
+                            this.sorted_countries.push({
+                                index: index,
+                                key: index.toString(),
+                                value: option
+                            });
+                        } else {
+                            this.sorted_countries.push({
+                                index: index,
+                                key: option.id.toString(),
+                                value: (option.title) ? option.title : (option.display_name) ? option.display_name : option.name
+                            });
+                        }
+                    }, this);
+                }
+            },
+
+            onDataWatch(company) {
+                if (Object.keys(company).length) {
+                    if (company.logo) {
+                        let logo_arr = [{
+                            id: company.logo.id,
+                            name: company.logo.filename + "." + company.logo.extension,
+                            path: company.logo.path,
+                            type: company.logo.mime_type,
+                            size: company.logo.size,
+                            downloadPath: false,
+                        }];
+
+                        this.logo.push(logo_arr);
+                    }
+                }
+            },
+
+            onEditSave(event) {
+                event.preventDefault();
+
+                if (this.logoCropProcessing) {
+                    return;
                 }
 
-                if (first_element > second_element) {
-                    return 1;
-                }
+                this.button_loading_company = true;
 
-                // names must be equal
-                return 0;
-            }
-        },
+                FormData.prototype.appendRecursive = function (data, wrapper = null) {
+                    for (var name in data) {
+                        if (name == "previewElement" || name == "previewTemplate") {
+                            continue;
+                        }
 
-        setSortedCountries() {
-            // Reset sorted_countries
-            this.sorted_countries = [];
+                        if (wrapper) {
+                            if (
+                                (typeof data[name] == "object" || Array.isArray(data[name])) &&
+                                data[name] instanceof File != true &&
+                                data[name] instanceof Blob != true
+                            ) {
+                                this.appendRecursive(data[name], wrapper + "[" + name + "]");
+                            } else {
+                                this.append(wrapper + "[" + name + "]", data[name]);
+                            }
+                        } else {
+                            if (
+                                (typeof data[name] == "object" || Array.isArray(data[name])) &&
+                                data[name] instanceof File != true &&
+                                data[name] instanceof Blob != true
+                            ) {
+                                this.appendRecursive(data[name], name);
+                            } else {
+                                this.append(name, data[name]);
+                            }
+                        }
+                    }
+                };
 
-            let created_options = this.countries;
+                const formData = new FormData(this.$refs["form"]);
 
-            // Option set sort_option data
-            if (!Array.isArray(created_options)) {
-                for (const [key, value] of Object.entries(created_options)) {
-                    this.sorted_countries.push({
-                        key: key.toString(),
-                        value: value
+                let data_name = {};
+
+                for (let [key, val] of formData.entries()) {
+                    Object.assign(data_name, {
+                        [key]: val,
                     });
                 }
-            } else {
-                created_options.forEach(function (option, index) {
-                    if (typeof(option) == 'string') {
-                        this.sorted_countries.push({
-                            index: index,
-                            key: index.toString(),
-                            value: option
-                        });
-                    } else {
-                        this.sorted_countries.push({
-                            index: index,
-                            key: option.id.toString(),
-                            value: (option.title) ? option.title : (option.display_name) ? option.display_name : option.name
-                        });
-                    }
-                }, this);
-            }
-        },
 
-        onDataWatch(company) {
-            if (Object.keys(company).length) {
-                if (company.logo) {
-                    let logo_arr = [{
-                        id: company.logo.id,
-                        name: company.logo.filename + "." + company.logo.extension,
-                        path: company.logo.path,
-                        type: company.logo.mime_type,
-                        size: company.logo.size,
-                        downloadPath: false,
-                    }];
+                let logo = '';
 
-                    this.logo.push(logo_arr);
+                if (this.$refs.dropzoneWizard.files[1]) {
+                    logo = this.$refs.dropzoneWizard.files[1];
+                } else if (this.$refs.dropzoneWizard.files[0]) {
+                    logo = this.$refs.dropzoneWizard.files[0];
                 }
 
-                this.real_date = company.financial_start;
-            }
-        },
-
-        onEditSave() {
-            FormData.prototype.appendRecursive = function (data, wrapper = null) {
-                for (var name in data) {
-                    if (name == "previewElement" || name == "previewTemplate") {
-                        continue;
-                    }
-
-                    if (wrapper) {
-                        if (
-                        (typeof data[name] == "object" || Array.isArray(data[name])) &&
-                        data[name] instanceof File != true &&
-                        data[name] instanceof Blob != true
-                        ) {
-                            this.appendRecursive(data[name], wrapper + "[" + name + "]");
-                        } else {
-                            this.append(wrapper + "[" + name + "]", data[name]);
-                        }
-                    } else {
-                        if (
-                        (typeof data[name] == "object" || Array.isArray(data[name])) &&
-                        data[name] instanceof File != true &&
-                        data[name] instanceof Blob != true
-                        ) {
-                            this.appendRecursive(data[name], name);
-                        } else {
-                            this.append(name, data[name]);
-                        }
-                    }
-                }
-            };
-
-            const formData = new FormData(this.$refs["form"]);
-
-            let data_name = {};
-
-            for (let [key, val] of formData.entries()) {
                 Object.assign(data_name, {
-                    [key]: val,
+                    ["logo"]: logo,
+                    ["_prefix"]: "company",
+                    ["_token"]: window.Laravel.csrfToken,
+                    ["_method"]: "POST",
                 });
-            }
 
-            let logo = '';
+                formData.appendRecursive(data_name);
 
-            if (this.$refs.dropzoneWizard.files[1]) {
-                logo = this.$refs.dropzoneWizard.files[1];
-            } else if (this.$refs.dropzoneWizard.files[0]) {
-                logo = this.$refs.dropzoneWizard.files[0];
-            }
+                this.company.financial_start = data_name.financial_start;
 
-            Object.assign(data_name, {
-                ["logo"]: logo,
-                ["_prefix"]: "company",
-                ["_token"]: window.Laravel.csrfToken,
-                ["_method"]: "POST",
-            });
+                window.axios({
+                    method: "POST",
+                    url: url + "/wizard/companies",
+                    data: formData,
+                    headers: {
+                        "X-CSRF-TOKEN": window.Laravel.csrfToken,
+                        "X-Requested-With": "XMLHttpRequest",
+                        "Content-Type": "multipart/form-data",
+                    },
+                })
+                .then((response) => {
+                    this.onSuccessMessage(response);
 
-            formData.appendRecursive(data_name);
+                    this.$router.push("/wizard/currencies");
+                    this.button_loading_company = false;
+                }, this)
+                .catch((error) => {
+                    this.onFailError(error);
 
-            window.axios({
-                method: "POST",
-                url: url + "/wizard/companies",
-                data: formData,
-                headers: {
-                    "X-CSRF-TOKEN": window.Laravel.csrfToken,
-                    "X-Requested-With": "XMLHttpRequest",
-                    "Content-Type": "multipart/form-data",
-                },
-            })
-            .then((response) => {
-                this.onSuccessMessage(response);
+                    this.button_loading_company = false;
+                }, this);
+            },
+
+            next() {
+                if (this.active++ > 2);
 
                 this.$router.push("/wizard/currencies");
-            }, this)
-            .catch((error) => {
-            }, this);
+            },
         },
 
-        next() {
-            if (this.active++ > 2);
-
-            this.$router.push("/wizard/currencies");
+        watch: {
+            company: function (company) {
+                this.onDataWatch(company);
+            },
         },
-    },
-
-    watch: {
-        company: function (company) {
-            this.onDataWatch(company);
-        },
-    },
-};
+    };
 </script>

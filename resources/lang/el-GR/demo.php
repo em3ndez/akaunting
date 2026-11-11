@@ -2,12 +2,30 @@
 
 return [
 
-    'accounts_cash'         => 'Μετρητά',
-    'categories_deposit'    => 'Κατάθεση',
-    'categories_sales'      => 'Πωλήσεις',
-    'currencies_usd'        => 'Δολάριο ΗΠΑ',
-    'currencies_eur'        => 'Ευρώ',
-    'currencies_gbp'        => 'Βρετανική Λίρα',
-    'currencies_try'        => 'Τουρκική Λίρα',
+    'accounts' => [
+        'cash'              => 'Μετρητά',
+    ],
+
+    'categories' => [
+        'deposit'           => 'Κατάθεση',
+        'sales'             => 'Πωλήσεις',
+    ],
+
+    'currencies' => [
+        'usd'               => 'Δολάριο ΗΠΑ',
+    ],
+
+    'offline_payments' => [
+        'cash'              => 'Μετρητά',
+        'bank'              => 'Τραπεζικό Έμβασμα',
+    ],
+
+    'reports' => [
+        'income'            => 'Μηνιαία περίληψη εσόδων ανά κατηγορία.',
+        'expense'           => 'Μηνιαία σύνοψη εξόδων ανά κατηγορία.',
+        'income_expense'    => 'Μηνιαία περίληψη εσόδων ανά κατηγορία.',
+        'tax'               => 'Τριμηνιαία περίληψη της φορολογίας.',
+        'profit_loss'       => 'Τριμηνιαία κέρδη ανά κατηγορία.',
+    ],
 
 ];

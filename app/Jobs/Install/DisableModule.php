@@ -26,8 +26,8 @@ class DisableModule extends Job
     public function __construct($alias, $company_id, $locale = null)
     {
         $this->alias = $alias;
-        $this->company_id = $company_id;
-        $this->locale = $locale ?: company($company_id)->locale;
+        $this->company_id = (int) $company_id;
+        $this->locale = $locale ?: company($company_id)->locale ?: config('setting.fallback.default.locale');
     }
 
     /**
@@ -38,6 +38,8 @@ class DisableModule extends Job
     public function handle()
     {
         $this->authorize();
+
+        event(new \App\Events\Module\Disabling($this->alias, $this->company_id));
 
         $command = "module:disable {$this->alias} {$this->company_id} {$this->locale}";
 
@@ -55,6 +57,16 @@ class DisableModule extends Job
     {
         if (! $this->moduleExists($this->alias)) {
             throw new \Exception("Module [{$this->alias}] not found.");
+        }
+
+        if ($this->moduleIsProtected($this->alias)) {
+            throw new \Exception(
+                trans('modules.errors.disable_protected', ['module' => module($this->alias)->getName()])
+            );
+        }
+
+        if (! in_array($this->locale, config('language.allowed'))) {
+            throw new \Exception("Unknown locale: {$this->locale}");
         }
     }
 }

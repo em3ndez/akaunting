@@ -19,11 +19,13 @@ return [
     'total'                 => 'Celkem',
 
     'item_name'             => 'Název položky|Název položek',
+    'recurring_bills'       => 'Opakující se účet|Opakující se účty',
 
     'show_discount'         => 'Sleva :discount%',
     'add_discount'          => 'Přidat slevu',
     'discount_desc'         => 'z mezisoučtu',
 
+    'payment_made'          => 'Platba vytvořena',
     'payment_due'           => 'Splatnost faktury',
     'amount_due'            => 'Dlužná částka',
     'paid'                  => 'Zaplaceno',
@@ -39,13 +41,17 @@ return [
     'receive_bill'          => 'Příjem faktury',
     'make_payment'          => 'Platba faktury',
 
+    'form_description' => [
+        'billing'           => 'Fakturační údaje se zobrazí ve vašem účtu. Datum faktury je použito v nástěnce a reportech. Vyberte datum, které chcete zaplatit jako termín splatnosti.',
+    ],
+
     'messages' => [
         'draft'             => 'Toto je <b>KONCEPT</b> faktury. Faktura bude promítnuta do grafů, jakmile bude zaplacena.',
 
         'status' => [
             'created'       => 'Vytvořeno :date',
             'receive' => [
-                'draft'     => 'Neodesláno',
+                'draft'     => 'Neobdrženo',
                 'received'  => 'Přijato :date',
             ],
             'paid' => [

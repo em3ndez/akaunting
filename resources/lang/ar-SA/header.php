@@ -6,23 +6,28 @@ return [
     'last_login'            => 'آخر تسجيل دخول :time',
 
     'notifications' => [
-        'counter'           => '{0} ليس لديك تنبيهات|{1} لديك :count تنبيهات|[2,*] لديك :count تنبيهات',
-        'new_apps'          => '{1} :count تطبيق جديد تم نشره<unk> [2,*] :count تطبيقات جديدة تم نشرها',
+        'counter'           => '{0} ليست لديك إشعارات جديدة|{1} لديك :count إشعار جديد|[2,*] لديك :count إشعارات جديدة',
+        'new_apps'          => '{1} نُشر :count تطبيق جديد|[2,*] نُشرت :count تطبيقات جديدة',
         'overdue_invoices'  => '{1} :count فاتورة متأخرة|[2,*] :count فواتير متأخرة',
         'upcoming_bills'    => '{1} :count فاتورة قادمة|[2,*] :count فواتير قادمة',
         'view_all'          => 'عرض الكل',
 
         'exports' => [
-            'completed' => '{1} :count انتهى التصدير <unk> [2,*] :count تم الانتهاء من الصادرات',
-            'failed' => '{1} :count فشل التصدير <unk> [2,*] :count فشل الصادرات',
+            'completed' => '{1} اكتمل :count تصدير|[2,*] اكتملت :count عمليات تصدير',
+            'failed' => '{1} فشل :count تصدير|[2,*] فشلت :count عمليات تصدير',
         ],
         'imports' => [
-            'completed' => '{1} :count الاستيراد النهائي <unk> [2,*] :count الواردات النهائية',
-            'failed' => '{1} :count فشل استيراد <unk> [2,*] :count فشل الواردات',
+            'completed' => '{1} اكتمل :count استيراد|[2,*] اكتملت :count عمليات استيراد',
+            'failed' => '{1} فشل :count استيراد|[2,*] فشلت :count عمليات استيراد',
         ],
     ],
 
     'docs_link'             => 'https://akaunting.com/docs',
     'support_link'          => 'https://akaunting.com/support',
+
+    'favorite' => [
+        'added_favorite'    => 'تمت الإضافة إلى المفضلة',
+        'add_favorite'      => 'إضافة إلى المفضلة',
+    ],
 
 ];

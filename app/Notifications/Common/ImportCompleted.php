@@ -6,6 +6,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\HtmlString;
 
 class ImportCompleted extends Notification implements ShouldQueue
 {
@@ -43,12 +44,14 @@ class ImportCompleted extends Notification implements ShouldQueue
      * @param  mixed  $notifiable
      * @return \Illuminate\Notifications\Messages\MailMessage
      */
-    public function toMail($notifiable)
+    public function toMail($notifiable): MailMessage
     {
         $dashboard_url = route('dashboard', ['company_id' => company_id()]);
 
         return (new MailMessage)
-            ->subject(trans('notifications.import.completed.subject'))
+            ->from(config('mail.from.address'), config('mail.from.name'))
+            ->subject(trans('notifications.import.completed.title'))
+            ->line(new HtmlString('<br><br>'))
             ->line(trans('notifications.import.completed.description'))
             ->action(trans_choice('general.dashboards', 1), $dashboard_url);
     }
@@ -62,6 +65,11 @@ class ImportCompleted extends Notification implements ShouldQueue
     public function toArray($notifiable)
     {
         return [
+            'title' => trans('notifications.menu.import_completed.title'),
+            'description' => trans('notifications.menu.import_completed.description', [
+                'type'  => $this->translation,
+                'count' => $this->total_rows,
+            ]),
             'translation' => $this->translation,
             'total_rows' => $this->total_rows,
         ];

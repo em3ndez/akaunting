@@ -15,13 +15,22 @@ class Reset extends Notification
     public $token;
 
     /**
+     * The email address.
+     *
+     * @var string
+     */
+    public $email;
+
+    /**
      * Create a notification instance.
      *
      * @param  string  $token
+     * @param  string  $email
      */
-    public function __construct($token)
+    public function __construct($token, $email)
     {
         $this->token = $token;
+        $this->email = $email;
     }
 
     /**
@@ -41,11 +50,12 @@ class Reset extends Notification
      * @param  mixed  $notifiable
      * @return \Illuminate\Notifications\Messages\MailMessage
      */
-    public function toMail($notifiable)
+    public function toMail($notifiable): MailMessage
     {
         return (new MailMessage)
+            ->from(config('mail.from.address'), config('mail.from.name'))
             ->line(trans('auth.notification.message_1'))
-            ->action(trans('auth.notification.button'), route('reset', $this->token))
+            ->action(trans('auth.notification.button'), route('reset', ['token' => $this->token, 'email' => $this->email]))
             ->line(trans('auth.notification.message_2'));
     }
 }

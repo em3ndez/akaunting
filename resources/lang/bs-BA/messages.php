@@ -13,11 +13,15 @@ return [
         'export_queued'     => ':type izvoz je zakazan! Dobićete email kad se završi.',
         'enabled'           => ': type omogućeno!',
         'disabled'          => ':type onemogućeno!',
+        'connected'         => ':type konektovan!',
+        'invited'           => ':type pozvan!',
+        'ended'             => ':type završen!',
 
         'clear_all'         => 'Super! Očistili ste sve svoje :type.',
     ],
 
     'error' => [
+        'transfer_transaction' => 'Greška: Nije vam dozvoljeno mijenjati/brisati transakciju jer pripada prijenosu!',
         'over_payment'      => 'Greška: Uplata nije dodana! Upisani iznos uplate premašuje ukupni iznos: :amount',
         'not_user_company'  => 'Pogreška: Nije vam dozvoljeno upravljanje ovom kompanijom!',
         'customer'          => 'Pogreška: Korisnik nije kreiran! :name već koristi ovu e-mail adresu.',
@@ -27,6 +31,8 @@ return [
         'invalid_apikey'    => 'Pogreška: Uneseni API token nije važeći!',
         'import_column'     => 'Greška:: poruka Naziv lista:: list. Broj retka:: linija.',
         'import_sheet'      => 'Pogreška: naziv liste nije važeći. Provjerite oglednu datoteku.',
+        'same_amount'       => 'Greška: Ukupan iznos podjele mora biti potpuno isti kao :ukupni iznos transakcije: :iznos',
+        'over_match'        => 'Greška: :tip nije povezan! Iznos koji ste unijeli ne može premašiti ukupan iznos uplate: :amount',
     ],
 
     'warning' => [

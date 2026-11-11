@@ -38,6 +38,10 @@ const app = new Vue({
         },
 
         onChangeCode(code) {
+            if (! code) {
+                return;
+            }
+
             axios.get(url + '/settings/currencies/config', {
                 params: {
                     code: code
@@ -54,5 +58,31 @@ const app = new Vue({
             .catch(error => {
             });
         }
+    },
+
+    watch: {
+        'form.default_currency': function (newVal, oldVal) {
+            if (newVal == 1) {
+                this.form.rate = 1;
+            }
+        },
+        'form.decimal_mark': function (newVal, oldVal) {
+            const regex = /^[A-Za-z.,_-\s-]+$/;
+
+            if (newVal && ! regex.test(newVal)) {
+                newVal = newVal.replace(/[^A-Za-z.,_-\s-]+/g, ".");
+            }
+
+            this.form.decimal_mark = newVal;
+        },
+        'form.thousands_separator': function (newVal, oldVal) {
+            const regex = /^[A-Za-z.,_-\s-]+$/;
+
+            if (newVal && ! regex.test(newVal)) {
+                newVal = newVal.replace(/[^A-Za-z.,_-\s-]+/g, ",");
+            }
+
+            this.form.thousands_separator = newVal;
+        },
     }
 });

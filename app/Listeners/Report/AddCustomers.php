@@ -11,8 +11,7 @@ use App\Events\Report\RowsShowing;
 class AddCustomers extends Listener
 {
     protected $classes = [
-        'App\Reports\IncomeSummary',
-        'App\Reports\IncomeExpenseSummary',
+        \App\Reports\IncomeSummary::class,
     ];
 
     /**
@@ -28,7 +27,14 @@ class AddCustomers extends Listener
         }
 
         $event->class->filters['customers'] = $this->getCustomers(true);
-        $event->class->filters['routes']['customers'] = 'customers.index';
+        $event->class->filters['routes']['customers'] = ['customers.index', 'search=enabled:1'];
+        $event->class->filters['multiple']['customers'] = true;
+        $event->class->filters['operators']['customers'] = [
+            'equal'     => true,
+            'not_equal' => true,
+            'multiple'  => true,
+            'range'     => false,
+        ];
     }
 
     /**
@@ -73,17 +79,8 @@ class AddCustomers extends Listener
             return;
         }
 
-        $all_customers = $this->getCustomers();
-
-        if ($customer_ids = $this->getSearchStringValue('customer_id')) {
-            $customers = explode(',', $customer_ids);
-
-            $rows = collect($all_customers)->filter(function ($value, $key) use ($customers) {
-                return in_array($key, $customers);
-            });
-        } else {
-            $rows = $all_customers;
-        }
+        // The customer chip sends contact_id, as every contact chip does
+        $rows = $this->filterRowsBySearchString($this->getCustomers(), 'contact_id');
 
         $this->setRowNamesAndValues($event, $rows);
     }

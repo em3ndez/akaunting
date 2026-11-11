@@ -50,10 +50,12 @@ return [
 
     'errors' => [
         'download'          => 'ダウンロードできません :module',
-        'zip'               => '作成できません :module zip ファイル',
+        'zip'               => '作成できません :module zip ファイル',
         'unzip'             => '解凍できません :module',
         'file_copy'         => 'コピーできません :module ファイル',
         'finish'            => 'ファイナライズできません :module のインストール',
+        'disable_protected' => ':module is required by Akaunting, so it cannot be disabled.',
+        'uninstall_protected' => ':module is required by Akaunting, so it cannot be uninstalled.',
     ],
 
     'badge' => [

@@ -22,6 +22,7 @@ return [
         'extension'         => ':extension Erweiterung muss installiert und geladen sein!',
         'directory'         => ':directory Verzeichnis muss schreibbar sein!',
         'executable'        => 'Die ausführbare PHP-CLI-Datei ist nicht definiert/funktioniert nicht oder die PHP-Version entspricht nicht :php_version oder höher! Bitten Sie Ihre Hosting-Firma, die Umgebungsvariablen PHP_BINARY oder PHP_PATH korrekt zu setzen.',
+        'npm'               => '<b>JavaScript-Dateien fehlen!</b> <br><br><span>Sie sollten die Befehle <em class="underline">npm install</em> und <em class="underline">npm run dev</em> ausführen.</span>',
     ],
 
     'database' => [
@@ -43,4 +44,8 @@ return [
         'connection'        => 'Fehler: Es konnte keine Verbindung zur Datenbank hergestellt werden! Stellen Sie sicher, dass die Angaben korrekt sind.',
     ],
 
+    'update' => [
+        'core'              => 'Eine neue Version von Akaunting ist verfügbar! Bitte aktualisieren Sie <a href=":url">Ihre Installation</a>.',
+        'module'            => 'Eine neue Version von :module ist verfügbar! Bitte aktualisieren Sie <a href=":url">Ihre Installation</a>.',
+    ],
 ];

@@ -19,13 +19,15 @@ return [
     'total'                 => 'Kopā',
 
     'item_name'             => 'Nosaukums|Nosaukumi',
+    'recurring_bills'       => 'Atkārtots rēķins|Atkārtoti rēķini',
 
-    'show_discount'         => 'Atlaide :atlaidet%',
+    'show_discount'         => 'Atlaide :discount%',
     'add_discount'          => 'Pievienot atlaidi',
     'discount_desc'         => 'no starpsummas',
 
+    'payment_made'          => 'Maksājums veikts',
     'payment_due'           => 'Kavēts rēķins',
-    'amount_due'            => 'Kavēts maksājums',
+    'amount_due'            => 'Kavēta summa',
     'paid'                  => 'Samaksāts',
     'histories'             => 'Vēsture',
     'payments'              => 'Maksājumi',
@@ -39,14 +41,18 @@ return [
     'receive_bill'          => 'Saņemt rēķinu',
     'make_payment'          => 'Veikt maksājumu',
 
+    'form_description' => [
+        'billing'           => 'Norēķinu informācija tiek parādīta jūsu rēķinā. Informācijas panelī un pārskatos tiek izmantots rēķina datums. Kā Apmaksas datumu atlasiet datumu, kurā plānojat veikt maksājumu.',
+    ],
+
     'messages' => [
         'draft'             => 'Šī ir rēķina <b>SAGATAVE</b> un tiks atspoguļota diagrammās pēc saņemšanas.',
 
         'status' => [
-            'created'       => 'Izveidots :datums',
+            'created'       => 'Izveidots :date',
             'receive' => [
                 'draft'     => 'Nav saņemts',
-                'received'  => 'Saņemts: datums',
+                'received'  => 'Saņemts: :date',
             ],
             'paid' => [
                 'await'     => 'Gaida maksājumu',

@@ -11,8 +11,12 @@ return [
     'transactions'          => 'İşlemler',
     'start_date'            => 'Başlangıç Tarihi',
     'end_date'              => 'Bitiş Tarihi',
-    'cleared_amount'        => 'Temizlenen Tutar',
+    'cleared_amount'        => 'Mutabakatı Yapılan Tutar',
     'deposit'               => 'Yatırılan',
     'withdrawal'            => 'Çekilen',
+    'reconciled_amount'     => 'Mutabakat Yapılan',
+    'in_progress'           => 'Devam Etmekte',
+    'save_draft'            => 'Taslak Olarak Kaydet',
+    'irreconcilable'        => 'Mutabakat Yapılamaz',
 
 ];

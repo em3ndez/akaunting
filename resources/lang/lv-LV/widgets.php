@@ -2,23 +2,33 @@
 
 return [
 
-    'currencies'                => 'Valūtas',
-    'total_income'              => 'Kopējie ieņēmumi',
-    'receivables'               => 'Pircēju parādi',
-    'open_invoices'             => 'Atvērtie rēķini',
-    'overdue_invoices'          => 'Nokavētie rēķini',
-    'total_expenses'            => 'Kopējie izdevumi',
+    'receivables'               => 'Pircēji',
     'payables'                  => 'Piegādātāju rēķini',
-    'open_bills'                => 'Atvērt rēķinus',
-    'overdue_bills'             => 'Nokavētie rēķini',
-    'total_profit'              => 'Kopējā peļņa',
-    'open_profit'               => 'Avērtā peļņa',
-    'overdue_profit'            => 'Peļņa (kavētie rēķini)',
     'cash_flow'                 => 'Naudas plūsma',
-    'no_profit_loss'            => 'Bez peļņas & zaudējumiem',
-    'income_by_category'        => 'Ieņēmumu kategorijas',
+    'profit_loss'               => 'Peļņa & zaudējumi',
     'expenses_by_category'      => 'Izdevumu kategorijas',
     'account_balance'           => 'Konta atlikums',
-    'latest_income'             => 'Jaunākie ienākumi',
-    'latest_expenses'           => 'Jaunākie izdevumi',
+    'bank_feeds'                => 'Savienojiet bankas kontus',
+    'currencies'                => 'Valūtas',
+
+    'view_report'               => 'Skatīt atskaiti',
+    'total_unpaid_invoices'     => 'Kopā neapmaksātie rēķini',
+    'total_unpaid_bills'        => 'Kopā neapmaksātie piegādātāju rēķini ',
+
+    'description' => [
+        'receivables'           => 'Summa, kas jums vēl jāsaņem no klientiem',
+        'payables'              => 'Summa, kas jums vēl jāmaksā saviem piegādātājiem',
+        'cash_flow'             => 'Nauda ienāk un iziet no jūsu uzņēmuma',
+        'profit_loss'           => 'Ieņēmumi un izdevumi, tostarp neapmaksāti rēķini un piegādātāju rēķini',
+        'expenses_by_category'  => 'Lielākie izdevumi dažādās kategorijās',
+        'account_balance'       => 'Pašreizējais jūsu bankas kontu atlikums',
+        'bank_feeds'            => 'Importējiet savus darījumus pakalpojumā Akaunting automātiski </br>, savienojot savus bankas kontus',
+    ],
+
+    'periods' => [
+        'overdue_1_30'          => 'Nokavēts 1-30 dienas',
+        'overdue_31_60'         => 'Nokavēts 31-60 dienas',
+        'overdue_61_90'         => '61-90 dienas nokavēts',
+        'overdue_91_un'         => '> 90 dienas nokavēts',
+    ],
 ];

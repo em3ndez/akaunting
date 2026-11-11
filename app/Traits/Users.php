@@ -2,6 +2,9 @@
 
 namespace App\Traits;
 
+use App\Models\Auth\UserInvitation;
+use Illuminate\Support\Facades\Route;
+
 trait Users
 {
     /**
@@ -26,7 +29,7 @@ trait Users
         $user = user();
 
         if (empty($user)) {
-            return false;
+            return app()->runningInConsole() ? true : false;
         }
 
         $company = $user->withoutEvents(function () use ($user, $id) {
@@ -100,10 +103,36 @@ trait Users
             return route('login');
         }
 
-        $route_name = $user->isCustomer() ? 'portal.dashboard' : $user->landing_page;
+        $route_name = $user->isCustomer()
+                    ? 'portal.dashboard'
+                    : (Route::has($user->landing_page) ? $user->landing_page : 'dashboard');
 
-        $company_id = company_id() ?: optional($this->getFirstCompanyOfUser())->id;
+        $company_id = company_id() ?: $this->getFirstCompanyOfUser()?->id;
+
+        if (empty($company_id)) {
+            return route('login');
+        }
 
         return route($route_name, ['company_id' => $company_id]);
+    }
+
+    /**
+     * Checks if the given user has a pending invitation.
+     *
+     * @return bool
+     */
+    public function hasPendingInvitation()
+    {
+        return $this->getPendingInvitation() ? true : false;
+    }
+
+    /**
+     * Returns if the given user has a pending invitation.
+     *
+     * @return null|UserInvitation
+     */
+    public function getPendingInvitation()
+    {
+        return UserInvitation::where('user_id', $this->id)->first();
     }
 }

@@ -2,22 +2,33 @@
 
 return [
 
-    'total_income'              => 'Total de Ingresos',
     'receivables'               => 'Cuentas por cobrar',
-    'open_invoices'             => 'Facturas Abiertas',
-    'overdue_invoices'          => 'Facturas Vencidas',
-    'total_expenses'            => 'Total de Gastos',
     'payables'                  => 'Cuentas por pagar',
-    'open_bills'                => 'Recibos Abiertos',
-    'overdue_bills'             => 'Recibos Vencidos',
-    'total_profit'              => 'Ganancias Totales',
-    'open_profit'               => 'Ganancias Pendientes',
-    'overdue_profit'            => 'Ganancias Vencidas',
-    'cash_flow'                 => 'Flujo de Efectivo',
-    'no_profit_loss'            => 'Sin pérdida de ganancias',
-    'income_by_category'        => 'Ingresos por Categoría',
-    'expenses_by_category'      => 'Gastos por Categoría',
-    'account_balance'           => 'Saldo de la Cuenta',
-    'latest_income'             => 'Últimos Ingresos',
-    'latest_expenses'           => 'Últimos Gastos',
+    'cash_flow'                 => 'Flujo de efectivo',
+    'profit_loss'               => 'Utilidades y pérdidas',
+    'expenses_by_category'      => 'Gastos por categoría',
+    'account_balance'           => 'Saldo de la cuenta',
+    'bank_feeds'                => 'Conectar cuentas bancarias',
+    'currencies'                => 'Monedas',
+
+    'view_report'               => 'Ver reporte',
+    'total_unpaid_invoices'     => 'Total de facturas no pagadas',
+    'total_unpaid_bills'        => 'Total de facturas de compra no pagadas',
+
+    'description' => [
+        'receivables'           => 'Monto que aún no ha recibido de sus clientes',
+        'payables'              => 'Monto que aún tiene que pagar a sus proveedores',
+        'cash_flow'             => 'Efectivo que entra y sale de su negocio',
+        'profit_loss'           => 'Ingresos y gastos, incluyendo facturas y facturas de compra no pagadas',
+        'expenses_by_category'  => 'Gastos principales en varias categorías',
+        'account_balance'       => 'Saldo actual de sus cuentas bancarias',
+        'bank_feeds'            => 'Importe sus transacciones a Akaunting automáticamente <br />conectando sus cuentas bancarias',
+    ],
+
+    'periods' => [
+        'overdue_1_30'          => '1-30 días vencidos',
+        'overdue_31_60'         => '31-60 días vencidos',
+        'overdue_61_90'         => '61-90 días vencidos',
+        'overdue_91_un'         => '> 90 días vencidos',
+    ],
 ];

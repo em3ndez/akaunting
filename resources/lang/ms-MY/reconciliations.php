@@ -2,15 +2,21 @@
 
 return [
 
-    'reconcile'             => 'Selaraskan',
-    'reconciled'            => 'Diselaraskan',
+    'reconcile'             => 'Sesuaikan',
+    'unreconcile'           => 'Nyahsesuaikan',
+    'reconciled'            => 'Disesuaikan',
+    'opening_balance'       => 'Baki Pembukaan',
     'closing_balance'       => 'Baki Penutup',
-    'unreconciled'          => 'Dibatalkan penyelarasan',
+    'unreconciled'          => 'Tidak Disesuaikan',
     'transactions'          => 'Transaksi',
     'start_date'            => 'Tarikh Mula',
     'end_date'              => 'Tarikh Tamat',
-    'cleared_amount'        => 'Amaun Dijelaskan',
+    'cleared_amount'        => 'Jumlah Dijelaskan',
     'deposit'               => 'Deposit',
     'withdrawal'            => 'Pengeluaran',
+    'reconciled_amount'     => 'Disesuaikan',
+    'in_progress'           => 'Sedang Berjalan',
+    'save_draft'            => 'Simpan sebagai Draf',
+    'irreconcilable'        => 'Tidak Boleh Disesuaikan',
 
 ];

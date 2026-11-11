@@ -1,9 +1,16 @@
 @if ($attachment)
-    <div class="row align-items-center">
-        @foreach ($attachment as $file)
-            <div class="col-xs-12 col-sm-4 mb-4">
-                @include('partials.media.file')
-            </div>
-        @endforeach
-    </div>
+    <x-show.accordion type="attachment">
+        <x-slot name="head">
+            <x-show.accordion.head
+                title="{{ trans_choice('general.attachments', 2) }}"
+                description="{{ trans('transactions.slider.attachments') }}"
+            />
+        </x-slot>
+
+        <x-slot name="body">
+            @foreach ($attachment as $file)
+                <x-media.file :file="$file" />
+            @endforeach
+        </x-slot>
+    </x-show.accordion>
 @endif

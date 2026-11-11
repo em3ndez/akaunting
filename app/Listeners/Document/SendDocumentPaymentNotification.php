@@ -19,12 +19,12 @@ class SendDocumentPaymentNotification
             return;
         }
 
-        if (!empty($event->request['mark_paid'])) {
-            return;
-        }
-
         $document = $event->document;
         $transaction = $document->transactions()->latest()->first();
+
+        if (! $transaction) {
+            return;
+        }
 
         // Notify the customer
         if ($document->contact && !empty($document->contact_email)) {
@@ -33,7 +33,7 @@ class SendDocumentPaymentNotification
 
         // Notify all users assigned to this company
         foreach ($document->company->users as $user) {
-            if (!$user->can('read-notifications')) {
+            if ($user->cannot('read-notifications')) {
                 continue;
             }
 

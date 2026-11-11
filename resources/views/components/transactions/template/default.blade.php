@@ -1,349 +1,417 @@
-@stack('company_start')
-@if (!$hideCompany)
-    <table class="border-bottom-1">
-        <tr>
-            @if (!$hideCompanyLogo)
-                <td style="width:5%;" valign="top">
-                    @stack('company_logo_start')
+<div class="print-template">
+    @stack('company_start')
+    @if (! $hideCompany)
+        <table class="border-bottom-1">
+            <tr>
+                @if (! $hideCompanyLogo)
+                <td style="width:20%; padding: 0 0 15px 0;" valign="top">
+                    @stack('company_logo_input_start')
                     @if (!empty($transaction->contact->logo) && !empty($transaction->contact->logo->id))
-                        <img src="{{ Storage::url($transaction->contact->logo->id) }}" height="128" width="128" alt="{{ $transaction->contact_name }}" />
+                        <img src="{{ Storage::url($transaction->contact->logo->id) }}" height="70" width="70" alt="{{ $transaction->contact_name }}" />
                     @else
-                        <img src="{{ $logo }}" alt="{{ setting('company.name') }}" />
+                        <img src="{{ $logo }}" height="70" width="70" alt="{{ setting('company.name') }}" />
                     @endif
-                    @stack('company_logo_end')
+                    @stack('company_logo_input_end')
                 </td>
-            @endif
+                @endif
 
-            @if (!$hideCompanyDetails)
-                <td style="width: 60%;">
+                @if (! $hideCompanyDetails)
+                <td class="text" style="width: 80%; padding: 0 0 15px 0;">
                     @stack('company_details_start')
-                    @if (!$hideCompanyName)
-                        <h2 class="mb-1" style="font-size: 16px;">
+                    @if (! $hideCompanyName)
+                        <span class="font-semibold text">
                             {{ setting('company.name') }}
-                        </h2>
+                        </span>
                     @endif
 
-                    @if (!$hideCompanyAddress)
-                        <p style="margin:0; padding:0; font-size:14px;">{!! nl2br(setting('company.address')) !!}</p>
+                    @if (! $hideCompanyAddress)
+                        <p><x-nl2br :value="setting('company.address')" /></p>
                     @endif
 
-                    @if (!$hideCompanyTaxNumber)
-                        <p style="margin:0; padding:0; font-size:14px;">
-                            @if (setting('company.tax_number'))
+                    @if (! $hideCompanyTaxNumber)
+                        @if (setting('company.tax_number'))
+                            <p>
                                 {{ trans('general.tax_number') }}: {{ setting('company.tax_number') }}
-                            @endif
-                        </p>
+                            </p>
+                        @endif
                     @endif
 
-                    @if (!$hideCompanyPhone)
-                        <p style="margin:0; padding:0; font-size:14px;">
-                            @if (setting('company.phone'))
+                    @if (! $hideCompanyPhone)
+                        @if (setting('company.phone'))
+                            <p>
                                 {{ setting('company.phone') }}
-                            @endif
-                        </p>
+                            </p>
+                        @endif
                     @endif
 
-                    @if (!$hideCompanyEmail)
-                        <p style="margin:0; padding:0; font-size:14px;">{{ setting('company.email') }}</p>
-                    @endif
+                    @if (! $hideCompanyEmail)
+                            <p>{{ setting('company.email') }}</p>
+                        @endif
                     @stack('company_details_end')
                 </td>
-            @endif
-        </tr>
-    </table>
-@endif
-@stack('company_end')
-
-@if (!$hideContentTitle)
-    <table>
-        <tr>
-            <td style="padding-bottom: 0; padding-top: 32px;">
-                <h2 class="text-center text-uppercase" style="font-size: 16px;">
-                    {{ trans($textContentTitle) }}
-                </h2>
-            </td>
-        </tr>
-    </table>
-@endif
-
-<table>
-    <tr>
-        <td style="width: 70%; padding-top:0; padding-bottom:0;">
-            <table>
-                @stack('paid_at_input_start')
-                @if (!$hidePaidAt)
-                    <tr>
-                        <td style="width: 20%; padding-bottom:3px; font-size:14px; font-weight: bold;">
-                            {{ trans($textPaidAt) }}:
-                        </td>
-
-                        <td class="border-bottom-1" style="width:80%; padding-bottom:3px; font-size:14px;">
-                            @date($transaction->paid_at)
-                        </td>
-                    </tr>
                 @endif
-                @stack('paid_at_input_end')
-
-                @stack('account_id_input_start')
-                @if (!$hideAccount)
-                    <tr>
-                        <td style="width: 20%; padding-bottom:3px; font-size:14px; font-weight: bold;">
-                            {{ trans_choice($textAccount, 1) }}:
-                        </td>
-
-                        <td class="border-bottom-1" style="width:80%; padding-bottom:3px; font-size:14px;">
-                            {{ $transaction->account->name }}
-                        </td>
-                    </tr>
-                @endif
-                @stack('account_id_input_end')
-
-                @stack('category_id_input_start')
-                @if (!$hideCategory)
-                    <tr>
-                        <td style="width: 20%; padding-bottom:3px; font-size:14px; font-weight: bold;">
-                            {{ trans_choice($textCategory, 1) }}:
-                        </td>
-
-                        <td class="border-bottom-1" style="width:80%; padding-bottom:3px; font-size:14px;">
-                            {{ $transaction->category->name }}
-                        </td>
-                    </tr>
-                @endif
-                @stack('category_id_input_end')
-
-                @stack('payment_method_input_start')
-                @if (!$hidePaymentMethods)
-                    <tr>
-                        <td style="width: 20%; padding-bottom:3px; font-size:14px; font-weight: bold;">
-                            {{ trans_choice($textPaymentMethods, 1) }}:
-                        </td>
-
-                        <td class="border-bottom-1" style="width:80%; padding-bottom:3px; font-size:14px;">
-                            {{ !empty($payment_methods[$transaction->payment_method]) ? $payment_methods[$transaction->payment_method] : trans('general.na') }}
-                        </td>
-                    </tr>
-                @endif
-                @stack('payment_method_input_end')
-
-                @stack('reference_input_start')
-                @if (!$hideReference)
-                    <tr>
-                        <td style="width: 20%; padding-bottom:3px; font-size:14px; font-weight: bold;">
-                            {{ trans($textReference) }}:
-                        </td>
-
-                        <td class="border-bottom-1" style="width:80%; padding-bottom:3px; font-size:14px;">
-                            {{ $transaction->reference }}
-                        </td>
-                    </tr>
-                @endif
-                @stack('reference_input_end')
-
-                @stack('description_input_start')
-                @if (!$hideDescription)
-                    <tr>
-                        <td style="width: 20%; padding-bottom:3px; font-size:14px; font-weight: bold;">
-                            {{ trans($textDescription) }}:
-                        </td>
-
-                        <td style="width:80%; padding-bottom:3px; font-size:14px;">
-                            <p style="font-size:14px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin: 0;">
-                                {!! nl2br($transaction->description) !!}
-                            </p>
-                        </td>
-                    </tr>
-                @endif
-                @stack('description_input_end')
-
-                @if (!$hideContact)
-                    <tr>
-                        <td style="padding-top:45px; padding-bottom:0;">
-                            <h2 style="font-size: 16px;">
-                                {{ trans($textPaidBy) }}
-                            </h2>
-                        </td>
-                    </tr>
-
-                    @if (!$hideContactInfo)
-                        <tr>
-                            <td style="padding-bottom:5px; padding-top:0; font-size:14px;">
-                                <strong>{{ trans($textContactInfo) }}</strong><br>
-                            </td>
-                        </tr>
-                    @endif
-
-                    @stack('name_input_start')
-                    @if (!$hideContactName)
-                        <tr>
-                            <td style="padding-bottom:5px; padding-top:0; font-size:14px;">
-                                <strong>{{ $transaction->contact->name }}</strong><br>
-                            </td>
-                        </tr>
-                    @endif
-                    @stack('name_input_end')
-
-                    @stack('address_input_start')
-                    @if (!$hideContactAddress)
-                        <tr>
-                            <td style="padding-bottom:5px; padding-top:0; font-size:14px;">
-                                <p style="margin:0; padding:0; font-size:14px;">
-                                    {!! nl2br($transaction->contact->address) !!}
-                                </p>
-                            </td>
-                        </tr>
-                    @endif
-                    @stack('address_input_end')
-
-                    @stack('tax_number_input_start')
-                    @if (!$hideContactTaxNumber)
-                        <tr>
-                            <td style="padding-bottom:5px; padding-top:0; font-size:14px;">
-                                <p style="margin:0; padding:0; font-size:14px;">
-                                    @if ($transaction->contact->tax_number)
-                                        {{ trans('general.tax_number') }}: {{ $transaction->contact->tax_number }}
-                                    @endif
-                                </p>
-                            </td>
-                        </tr>
-                    @endif
-                    @stack('tax_number_input_end')
-
-                    @stack('phone_input_start')
-                    @if (!$hideContactPhone)
-                        <tr>
-                            <td style="padding-bottom:0; padding-top:0; font-size:14px;">
-                                <p style="margin:0; padding:0; font-size:14px;">
-                                    @if ($transaction->contact->phone)
-                                        {{ $transaction->contact->phone }}
-                                    @endif
-                                </p>
-                            </td>
-                        </tr>
-                    @endif
-                    @stack('phone_input_end')
-
-                    @stack('email_start')
-                    @if (!$hideContactEmail)
-                        <tr>
-                            <td style="padding-bottom:0; padding-top:0; font-size:14px;">
-                                <p style="margin:0; padding:0; font-size:14px;">
-                                    {{ $transaction->contact->email }}
-                                </p>
-                            </td>
-                        </tr>
-                    @endif
-                    @stack('email_input_end')
-                @endif
-            </table>
-        </td>
-
-        @if (!$hideAmount)
-            <td style="width:30%; padding-top:32px; padding-left: 25px;" valign="top">
-                <table>
-                    <tr>
-                        <td style="background-color: #6da252; -webkit-print-color-adjust: exact; font-weight:bold !important; display:block;">
-                            <h5 class="text-muted mb-0 text-white" style="font-size: 20px; color:#ffffff; text-align:center; margin-top: 16px;">
-                                {{ trans($textAmount) }}
-                            </h5>
-
-                            <p class="font-weight-bold mb-0 text-white" style="font-size: 26px; color:#ffffff; text-align:center;">
-                                @money($transaction->amount, $transaction->currency_code, true)
-                            </p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        @endif
-    </tr>
-</table>
-
-@if (!$hideRelated)
-    @if ($transaction->document)
-        <table>
-            <tr>
-                <td class="border-bottom-1" style="padding-bottom: 0; padding-top:16px;"></td>
             </tr>
         </table>
+    @endif
+    @stack('company_end')
 
+    @if (! $hideContentTitle)
         <table>
             <tr>
-                <td style="padding-bottom: 0; padding-top:36px;">
-                    <h2 style="font-size: 16px;">{{ trans($textRelatedTransansaction) }}</h2>
+                <td style="width: 60%; padding: 15px 0 15px 0;">
+                    <div class="font-semibold" style="font-size: 12px;">
+                        {{ $textContentTitle != trans_choice($textContentTitle, 1) ? trans_choice($textContentTitle, 1) : trans($textContentTitle) }}
+                    </div>
                 </td>
             </tr>
         </table>
+    @endif
 
-        <table class="table table-flush table-hover" cellspacing="0" cellpadding="0" style="margin-bottom: 36px;">
-            <thead style="background-color: #f6f9fc; -webkit-print-color-adjust: exact; font-family: Arial, sans-serif; color:#8898aa; font-size:11px;">
-                <tr class="border-bottom-1">
-                    @if (!$hideRelatedDocumentNumber)
-                        <th class="item text-left" style="text-align: left; text-transform: uppercase; font-family: Arial, sans-serif;">
-                            <span>{{ trans_choice($textRelatedDocumentNumber, 1) }}</span>
-                        </th>
-                    @endif
+    <table>
+        @stack('number_input_start')
+        @if (! $hideNumber)
+            <tr>
+                <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                    {{ trans_choice($textNumber, 1) }}
+                </td>
 
-                    @if (!$hideRelatedContact)
-                        <th class="quantity" style="text-align: left; text-transform: uppercase; font-family: Arial, sans-serif;">
-                            {{ trans_choice($textRelatedContact, 1) }}
-                        </th>
-                    @endif
+                <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                    {{ $transaction->number }}
+                </td>
+            </tr>
+        @endif
+        @stack('number_input_end')
 
-                    @if (!$hideRelatedDocumentDate)
-                        <th class="price" style="text-align: left; text-transform: uppercase; font-family: Arial, sans-serif;">
-                            {{ trans($textRelatedDocumentDate) }}
-                        </th>
-                    @endif
+        @stack('paid_at_input_start')
+        @if (! $hidePaidAt)
+            <tr>
+                <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                    {{ trans($textPaidAt) }}
+                </td>
 
-                    @if (!$hideRelatedDocumentAmount)
-                        <th class="price" style="text-align: left; text-transform: uppercase; font-family: Arial, sans-serif;">
-                            {{ trans($textRelatedDocumentAmount) }}
-                        </th>
-                    @endif
+                <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                    @date($transaction->paid_at)
+                </td>
+            </tr>
+        @endif
+        @stack('paid_at_input_end')
 
-                    @if (!$hideRelatedAmount)
-                        <th class="total" style="text-align: left; text-transform: uppercase; font-family: Arial, sans-serif;">
-                            {{ trans($textRelatedAmount) }}
-                        </th>
-                    @endif
-                </tr>
-            </thead>
+        @stack('account_id_input_start')
+        @if (! $hideAccount)
+            <tr>
+                <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                    {{ trans_choice($textAccount, 1) }}
+                </td>
 
-            <tbody>
+                <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                    {{ $transaction->account->name }}
+                </td>
+            </tr>
+        @endif
+        @stack('account_id_input_end')
+
+        @stack('category_id_input_start')
+        @if (! $hideCategory)
+            <tr>
+                <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                    {{ trans_choice($textCategory, 1) }}
+                </td>
+
+                <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                    {{ $transaction->category->name }}
+                </td>
+            </tr>
+        @endif
+        @stack('category_id_input_end')
+
+        @stack('payment_method_input_start')
+        @if (! $hidePaymentMethods)
+            <tr>
+                <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                    {{ trans_choice($textPaymentMethods, 1) }}
+                </td>
+
+                <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                    <x-payment-method :method="$transaction->payment_method" />
+                </td>
+            </tr>
+        @endif
+        @stack('payment_method_input_end')
+
+        @stack('reference_input_start')
+        @if (! $hideReference)
+            <tr>
+                <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                    {{ trans($textReference) }}
+                </td>
+
+                <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                    {{ $transaction->reference }}
+                </td>
+            </tr>
+        @endif
+        @stack('reference_input_end')
+
+        @stack('description_input_start')
+        @if (! $hideDescription)
+            <tr>
+                <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                    {{ trans($textDescription) }}
+                </td>
+
+                <td valign="top" class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                    <p style="font-size:12px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin: 0;">
+                        <x-nl2br :value="$transaction->description" />
+                    </p>
+                </td>
+            </tr>
+        @endif
+        @stack('description_input_end')
+
+        @stack('contact_id_input_start')
+        @stack('contact_id_input_end')
+    </table>
+
+    <table class="border-top-1" style="margin-top:15px;">
+        <tr>
+            <td style="width: 60%; padding: 15px 0 15px 0;">
+                <div class="font-semibold" style="font-size: 12px;">
+                    {{ trans($textPaidBy) }}
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <table class="border-bottom-1" style="padding-bottom:15px;">
+        @if (! $hideContact)
+            @if (! $hideContactInfo)
                 <tr>
-                    @if (!$hideRelatedDocumentNumber)
-                        <td class="item" style="color:#525f7f; font-size:13px;">
-                            <a style="color:#6da252 !important;" href="{{ route($routeDocumentShow, $transaction->document->id) }}">
-                                {{ $transaction->document->document_number }}
-                            </a>
-                        </td>
-                    @endif
-
-                    @if (!$hideRelatedContact)
-                        <td class="quantity" style="color:#525f7f; font-size:13px;">
-                            {{ $transaction->document->contact_name }}
-                        </td>
-                    @endif
-
-                    @if (!$hideRelatedDocumentDate)
-                        <td class="price" style="color:#525f7f; font-size:13px;">
-                            @date($transaction->document->due_at)
-                        </td>
-                    @endif
-
-                    @if (!$hideRelatedDocumentAmount)
-                        <td class="price" style="color:#525f7f; font-size:13px;">
-                            @money($transaction->document->amount, $transaction->document->currency_code, true)
-                        </td>
-                    @endif
-
-                    @if (!$hideRelatedAmount)
-                        <td class="total" style="color:#525f7f; font-size:13px;">
-                            @money($transaction->amount, $transaction->currency_code, true)
-                        </td>
-                    @endif
+                    <td class="font-semibold" style="margin: 0px; padding: 0 0 8px 0; font-size: 12px;">
+                        {{ trans($textContactInfo) }}<br>
+                    </td>
                 </tr>
-            </tbody>
+            @endif
+
+            @stack('name_input_start')
+            @if (! $hideContactName)
+                <tr>
+                    <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                        {{ trans('general.name') }}
+                    </td>
+
+                    <td class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                        {{ $transaction->contact->name }}
+                    </td>
+                </tr>
+            @endif
+            @stack('name_input_end')
+
+            @stack('address_input_start')
+            @if (! $hideContactAddress)
+                <tr>
+                    <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                        {{ trans('general.address') }}
+                    </td>
+
+                    <td class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                        <x-nl2br :value="$transaction->contact->address" />
+                    </td>
+                </tr>
+            @endif
+            @stack('address_input_end')
+
+            @stack('tax_number_input_start')
+            @if (! $hideContactTaxNumber)
+                <tr>
+                    <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                        {{ trans('general.tax_number') }}
+                    </td>
+
+                    <td class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                        @if ($transaction->contact->tax_number)
+                            {{ $transaction->contact->tax_number }}
+                        @endif
+                    </td>
+                </tr>
+            @endif
+            @stack('tax_number_input_end')
+
+            @stack('phone_input_start')
+            @if (! $hideContactPhone)
+                <tr>
+                    <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                        {{ trans('general.phone') }}
+                    </td>
+
+                    <td class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                        @if ($transaction->contact->phone)
+                            {{ $transaction->contact->phone }}
+                        @endif
+                    </td>
+                </tr>
+            @endif
+            @stack('phone_input_end')
+
+            @stack('email_start')
+            @if (! $hideContactEmail)
+                <tr>
+                    <td valign="top" class="font-semibold" style="width: 30%; margin: 0px; padding: 8px {{ language()->direction() === 'rtl' ? '0 0 4px' : '4px 0 0' }}; font-size: 12px;">
+                        {{ trans('general.email') }}
+                    </td>
+
+                    <td class="border-bottom-dashed-black" style="width:70%; margin: 0px; padding: 8px 0 0 0; font-size: 12px;">
+                        {{ $transaction->contact->email }}
+                    </td>
+                </tr>
+            @endif
+            @stack('email_input_end')
+        @endif
+
+        @stack('amount_input_start')
+        {{-- The reason for adding the amount part here is because the amount style is broken in the view. --}}
+        @stack('amount_input_end')
+
+        <tr>
+            <td></td>
+        </tr>
+    </table>
+
+    @if (! $hideRelated)
+        @if ($transaction->document)
+            <table>
+                <tr>
+                    <td style="padding:15px 0 0 0;">
+                        <div class="font-semibold" style="font-size: 12px; margin-bottom: 15px;">
+                            {{ trans($textRelatedTransansaction) }}
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <table class="table" cellspacing="0" cellpadding="0" style="padding:15px 0 0 0;">
+                <thead style="color:#424242; font-size:12px;">
+                    <tr class="border-bottom-1">
+                        <td class="item text-alignment-left ltr:text-left rtl:text-right font-semibold" style="padding:5px 0;">
+                            @if (! $hideRelatedDocumentNumber)
+                                <span style="font-size: 13px;">
+                                    {{ trans_choice($textRelatedDocumentNumber, 1) }}
+                                </span>
+                                <br />
+                            @endif
+
+                            @if (! $hideRelatedContact)
+                                <span>
+                                    {{ trans_choice($textRelatedContact, 1) }}
+                                </span>
+                            @endif
+                        </td>
+
+                        @if (! $hideRelatedDocumentDate)
+                            <td class="price font-semibold" style="padding:5px 0; text-align:center;">
+                                {{ trans($textRelatedDocumentDate) }}
+                            </td>
+                        @endif
+
+                        <td class="price text-alignment-right ltr:text-right rtl:text-left font-semibold" style="padding: 5px 0;">
+                            @if (! $hideRelatedDocumentAmount)
+                                <span style="font-size: 13px;">
+                                    {{ trans($textRelatedDocumentAmount) }}
+                                </span>
+                                <br />
+                            @endif
+
+                            @if (! $hideRelatedAmount)
+                                <span>
+                                    {{ trans($textRelatedAmount) }}
+                                </span>
+                            @endif
+                        </td>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr>
+                        <td class="item text-alignment-left ltr:text-left rtl:text-right" style="color:#424242; font-size:12px; padding-{{ language()->direction() === 'rtl' ? 'right' : 'left' }}:0;">
+                            @if (! $hideRelatedDocumentNumber)
+                                <a class="text-medium" style="border-bottom:1px solid;" href="{{ route($routeDocumentShow, $transaction->document->id) }}">
+                                    {{ $transaction->document->document_number }}
+                                </a>
+                                <br />
+                            @endif
+
+                            @if (! $hideRelatedContact)
+                                <span style="color: #6E6E6E">
+                                    {{ $transaction->document->contact_name }}
+                                </span>
+                            @endif
+                        </td>
+
+                        @if (! $hideRelatedDocumentDate)
+                            <td class="price" style="color:#424242; font-size:12px; text-align:center;">
+                                @date($transaction->document->due_at)
+                            </td>
+                        @endif
+
+                        <td class="price text-alignment-right ltr:text-right rtl:text-left" style="color:#424242; font-size:12px; padding-{{ language()->direction() === 'rtl' ? 'left' : 'right' }}:0;">
+                            @if (! $hideRelatedDocumentAmount)
+                                <x-money :amount="$transaction->document->amount" :currency="$transaction->document->currency_code" /> <br />
+                            @endif
+
+                            @if (! $hideRelatedAmount)
+                                <span style="color: #6E6E6E">
+                                    <x-money :amount="$transaction->amount" :currency="$transaction->currency_code" />
+                                </span>
+                            @endif
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        @endif
+    @endif
+
+    @if (! $hideAmount)
+        @if ($transaction->taxes->count())
+        <div class="row mt-3 clearfix">
+            <div class="col-40 ltr:float-right rtl:float-left ltr:text-right rtl:text-left">
+                <div class="text border-bottom-dashed-black py-1">
+                    <span class="ltr:float-left rtl:float-right font-semibold">
+                        {{ trans('general.before_tax') }}:
+                    </span>
+
+                    <span>
+                        <x-money :amount="$transaction->amount_before_tax" :currency="$transaction->currency_code" />
+                    </span>
+                </div>
+                @foreach ($transaction->taxes as $tax)
+                <div class="text border-bottom-dashed-black py-1">
+                    <span class="ltr:float-left rtl:float-right font-semibold">
+                        {{ $tax->tax->title }}:
+                    </span>
+
+                    <span>
+                        <x-money :amount="$tax->amount" :currency="$transaction->currency_code" />
+                    </span>
+                </div>
+                @endforeach
+            </div>
+        </div>
+        @endif
+
+        <table style="width:100%; text-align: {{ language()->direction() === 'rtl' ? 'left' : 'right' }}; margin-top:35px;">
+            <tr>
+                @if (language()->direction() !== 'rtl')
+                <td style="width:20%;"></td>
+                @endif
+                <td valign="center" style="width:80%; font-size: 14px; background-color: #55588B; -webkit-print-color-adjust: exact; color:#ffffff; border-radius: 5px;">
+                    <span class="ltr:mr-2 rtl:ml-2 font-semibold" style="color: #ffffff;">
+                        {{ trans($textAmount) }}
+                    </span>
+                    <x-money :amount="$transaction->amount" :currency="$transaction->currency_code" />
+                </td>
+                @if (language()->direction() === 'rtl')
+                <td style="width:20%;"></td>
+                @endif
+            </tr>
         </table>
     @endif
-@endif
+</div>

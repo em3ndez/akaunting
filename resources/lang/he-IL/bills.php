@@ -19,11 +19,13 @@ return [
     'total'                 => 'סה"כ',
 
     'item_name'             => 'פריט שם | שמות הפריטים',
+    'recurring_bills'       => 'חשבונות מחזוריים',
 
     'show_discount'         => ':discount % הנחה',
     'add_discount'          => 'הוסף הנחה',
     'discount_desc'         => 'של סכום ביניים',
 
+    'payment_made'          => 'תשלום בוצע',
     'payment_due'           => 'מועד התשלום',
     'amount_due'            => 'סכום לחיוב',
     'paid'                  => 'שולם',
@@ -37,7 +39,11 @@ return [
     'send_mail'             => 'שלח דואר אלקטרוני',
     'create_bill'           => 'יצירת חשבונית',
     'receive_bill'          => 'קבלת חשבונית',
-    'make_payment'          => 'תשלום',
+    'make_payment'          => 'ביצוע תשלום',
+
+    'form_description' => [
+        'billing'           => 'פרטים החיוב נמצאים בקבלה. תאריך החיוב מופיע בכל הדוחות. אנא בחר את התאריך כמועד התשלום',
+    ],
 
     'messages' => [
         'draft'             => 'החשבון <B>בטיוטה</B> ויופיע בגרפים רק לאחר שיאושר',

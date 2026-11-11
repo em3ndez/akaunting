@@ -2,23 +2,33 @@
 
 return [
 
-    'currencies'                => 'Valuta\'s',
-    'total_income'              => 'Totale inkomsten',
     'receivables'               => 'Debiteuren',
-    'open_invoices'             => 'Openstaande facturen',
-    'overdue_invoices'          => 'Vervallen facturen',
-    'total_expenses'            => 'Totale uitgaven',
     'payables'                  => 'Schulden',
-    'open_bills'                => 'Openstaande rekeningen',
-    'overdue_bills'             => 'Achterstallige rekeningen',
-    'total_profit'              => 'Totale winst',
-    'open_profit'               => 'Openstaande winst',
-    'overdue_profit'            => 'Achterstallige winst',
     'cash_flow'                 => 'Geldstroom',
-    'no_profit_loss'            => 'Geen winstderving',
-    'income_by_category'        => 'Inkomsten per categorie',
+    'profit_loss'               => 'Winst & Verlies',
     'expenses_by_category'      => 'Uitgaves per categorie',
     'account_balance'           => 'Rekeningsaldo',
-    'latest_income'             => 'Laatste inkomsten',
-    'latest_expenses'           => 'Laatste uitgaven',
+    'bank_feeds'                => 'Bankrekeningen Koppelen',
+    'currencies'                => 'Valuta\'s',
+
+    'view_report'               => 'Bekijk Rapport',
+    'total_unpaid_invoices'     => 'Totaal onbetaalde facturen',
+    'total_unpaid_bills'        => 'Totaal onbetaalde rekeningen',
+
+    'description' => [
+        'receivables'           => 'Bedrag dat je nog moet ontvangen van je klanten',
+        'payables'              => 'Bedrag dat je nog moet betalen aan je leveranciers',
+        'cash_flow'             => 'Contant geld dat uw bedrijf binnenkomt en verlaat',
+        'profit_loss'           => 'Inkomsten en uitgaven met inbegrip van onbetaalde facturen en rekeningen',
+        'expenses_by_category'  => 'Top uitgaven in verschillende categorieën',
+        'account_balance'       => 'Huidig saldo van uw bankrekeningen',
+        'bank_feeds'            => 'Importeer uw transacties automatisch naar Akaunting <br />door uw bankrekeningen te koppelen',
+    ],
+
+    'periods' => [
+        'overdue_1_30'          => '1-30 dagen over tijd',
+        'overdue_31_60'         => '31-60 dagen over tijd',
+        'overdue_61_90'         => '61-90 dagen over tijd',
+        'overdue_91_un'         => '> 90 dagen over tijd',
+    ],
 ];

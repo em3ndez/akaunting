@@ -6,14 +6,11 @@ use App\Abstracts\Http\Controller;
 use App\Exports\Common\Items as Export;
 use App\Http\Requests\Common\Item as Request;
 use App\Http\Requests\Common\Import as ImportRequest;
-use App\Http\Requests\Common\TotalItem as TotalRequest;
 use App\Imports\Common\Items as Import;
 use App\Jobs\Common\CreateItem;
 use App\Jobs\Common\DeleteItem;
 use App\Jobs\Common\UpdateItem;
 use App\Models\Common\Item;
-use App\Models\Setting\Category;
-use App\Models\Setting\Currency;
 use App\Models\Setting\Tax;
 use App\Traits\Uploads;
 
@@ -22,13 +19,23 @@ class Items extends Controller
     use Uploads;
 
     /**
+     * Instantiate a new controller instance.
+     */
+    public function __construct()
+    {
+        parent::__construct();
+
+        $this->middleware('permission:read-common-items')->only('autocomplete');
+    }
+
+    /**
      * Display a listing of the resource.
      *
      * @return Response
      */
     public function index()
     {
-        $items = Item::with('category', 'media')->collect();
+        $items = Item::with('category', 'media', 'taxes')->collect();
 
         return $this->response('common.items.index', compact('items'));
     }
@@ -50,11 +57,9 @@ class Items extends Controller
      */
     public function create()
     {
-        $categories = Category::item()->enabled()->orderBy('name')->take(setting('default.select_limit'))->pluck('name', 'id');
-
         $taxes = Tax::enabled()->orderBy('name')->get()->pluck('title', 'id');
 
-        return view('common.items.create', compact('categories', 'taxes'));
+        return view('common.items.create', compact('taxes'));
     }
 
     /**
@@ -70,7 +75,7 @@ class Items extends Controller
         if ($response['success']) {
             $response['redirect'] = route('items.index');
 
-            $message = trans('messages.success.added', ['type' => trans_choice('general.items', 1)]);
+            $message = trans('messages.success.created', ['type' => trans_choice('general.items', 1)]);
 
             flash($message)->success();
         } else {
@@ -135,15 +140,9 @@ class Items extends Controller
      */
     public function edit(Item $item)
     {
-        $categories = Category::item()->enabled()->orderBy('name')->take(setting('default.select_limit'))->pluck('name', 'id');
-
-        if ($item->category && !$categories->has($item->category_id)) {
-            $categories->put($item->category->id, $item->category->name);
-        }
-
         $taxes = Tax::enabled()->orderBy('name')->get()->pluck('title', 'id');
 
-        return view('common.items.edit', compact('item', 'categories', 'taxes'));
+        return view('common.items.edit', compact('item', 'taxes'));
     }
 
     /**
@@ -253,14 +252,15 @@ class Items extends Controller
         $currency_code = request('currency_code');
 
         if (empty($currency_code) || (strtolower($currency_code)  == 'null')) {
-            $currency_code = setting('default.currency');
+            $currency_code = default_currency();
         }
 
-        $autocomplete = Item::autocomplete([
+        $autocomplete = Item::with('taxes')->autocomplete([
             'name' => $query
         ]);
 
-        $items = $autocomplete->get();
+        // Eager load taxes and tax relationships to prevent N+1 queries
+        $items = $autocomplete->with(['taxes.tax'])->get();
 
         if ($items) {
             foreach ($items as $item) {
@@ -271,6 +271,7 @@ class Items extends Controller
                     $inclusives = $compounds = [];
 
                     foreach($item->taxes as $item_tax) {
+                        // Tax relationship is now eager loaded, preventing N+1 query
                         $tax = $item_tax->tax;
 
                         switch ($tax->type) {

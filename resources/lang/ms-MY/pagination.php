@@ -4,7 +4,6 @@ return [
 
     'previous'              => 'Sebelumnya',
     'next'                  => 'Seterusnya',
-    'showing'               => ':pertama-:terakhir dari :jumlah keseluruhan.',
+    'showing'               => ':first-:last daripada :total rekod.',
     'page'                  => 'setiap halaman.',
-
 ];

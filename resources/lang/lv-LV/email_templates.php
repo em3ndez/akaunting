@@ -4,7 +4,7 @@ return [
 
     'invoice_new_customer' => [
         'subject'       => '{invoice_number} rēķins izveidots',
-        'body'          => 'Cien. {customer_name},<br /><br />Mēs jums esam sagatavojuši šādu rēķinu: <strong>{invoice_number}</strong>.<br /><br />Varat skatīt rēķina informāciju un turpināt maksājumu no šādas saites: <a href="{invoice_guest_link}">{invoice_number}</a>.<br /><br />Varat sazināties ar mums, uzdodot jebkādus jautājumus.<br /><br />Labākie vēlējumi,<br />{company_name}',
+        'body'          => 'Cien.{customer_name},<br /><br />Mēs esam sagatavojuši jums šādu rēķinu: <strong>{invoice_number}</strong>.<br /><br />Varat skatīt rēķina informāciju un turpināt maksājumu, izmantojot šo saiti:<a href="{invoice_guest_link}">{invoice_number}</a>.<br /><br />Ja jums ir kādi jautājumi, sazinieties ar mums.<br /><br />Labākie novēlējumi,<br />{company_name}',
     ],
 
     'invoice_remind_customer' => [
@@ -28,9 +28,14 @@ return [
         'body'          => 'Sveiki,<br /><br />Pamatojoties uz {customer_name} periodiskumu, <strong>{invoice_number}</strong> rēķins ir izveidots automātiski.<br /><br />Rēķina detaļas var apskatīt šajā saitē: <a href="{invoice_admin_link}">{invoice_number}</a>.<br /><br />Labākie vēlējumi,<br />{company_name}',
     ],
 
+    'invoice_view_admin' => [
+        'subject'       => 'Rēķins {invoice_number} skatīts',
+        'body'          => 'Sveiki,<br /><br />{customer_name} ir apskatījis <strong>{invoice_number}</strong> rēķinu.<br /><br />Jūs varat apskatīt rēķina detaļas šajā saitē: <a href="{invoice_admin_link}">{invoice_number}</a>.<br /><br />Labākie vēlējumi,<br />{company_name}',
+    ],
+
     'invoice_payment_customer' => [
-        'subject'       => 'Rēķina Nr. {invoice_number} apmaksa saņemta',
-        'body'          => 'Cien., {customer_name},<br /><br />Paldies par maksājumu. Maksājuma rekvizīti atrodas zemāk:<br /><br />-------------------------------------------------<br />Summa: <strong>{transaction_total}</strong><br />Datums: <strong>{transaction_paid_date}</strong><br />Rēķina numurs: <strong>{invoice_number}</strong><br />-------------------------------------------------<br /><br />Rēķina detaļas vienmēr var skatīt šajā saitē: <a href="{invoice_guest_link}">{invoice_number}</a>.<br /><br />Varat sazināties ar mums, uzdodot jebkādus jautājumus.<br /><br />Labākie vēlējumi,<br />{company_name}',
+        'subject'       => 'Saņemts maksājums par rēķinu {invoice_number}',
+        'body'          => 'Cien. {customer_name}!<br /><br />Paldies par maksājumu! Tālāk atrodiet maksājuma informāciju:<br /><br />------------------------------------- -------------<br />Summa: <strong>{transaction_total}</strong><br />Datums: <strong>{transaction_paid_date}</strong><br />Rēķins Numurs: <strong>{invoice_number}</strong><br />----------------------------------- ---------------<br /><br />Jūs vienmēr varat skatīt detalizētu informāciju par rēķinu, izmantojot šo saiti: <a href="{invoice_guest_link}">{invoice_number}</ a>.<br /><br />Ja jums ir kādi jautājumi, sazinieties ar mums.<br /><br />Labākie vēlējumi,<br />{company_name}',
     ],
 
     'invoice_payment_admin' => [
@@ -45,16 +50,16 @@ return [
 
     'bill_recur_admin' => [
         'subject'       => 'Izveidots periodiskais rēķins Nr.{bill_number} ',
-        'body'          => 'Hello,<br /><br />Based on {vendor_name} recurring circle, <strong>{bill_number}</strong> invoice has been automatically created.<br /><br />You can see the bill details from the following link: <a href="{bill_admin_link}">{bill_number}</a>.<br /><br />Best Regards,<br />{company_name}',
+        'body'          => 'Hello,<br /><br />Pamatojoties uz {vendor_name} periodiskumu, <strong>{bill_number}</strong> rēķins bija automātiski izveidots.<br /><br />Jūs varat skatīt rēķina informāciju no sekojošas saites : <a href="{bill_admin_link}">{bill_number}</a>.<br /><br />Best Regards,<br />{company_name}',
     ],
 
-    'revenue_new_customer' => [
-        'subject'       => 'Maksājums izveidots:{revenue_date}',
-        'body'          => 'Cien. {customer_name},<br /><br />Esam sagatavojuši šādu maksājumu. <br /><br />Maksājuma informāciju varat skatīt šajā saitē: <a href="{revenue_guest_link}">{revenue_date}</a>.<br /><br />Varat sazināties ar mums, uzdodot jebkādus jautājumus.<br /><br />Labākie vēlējumi,<br />{company_name}',
+    'payment_received_customer' => [
+        'subject'       => 'Jūsu kvīts no {company_name}',
+        'body'          => 'Cien. {contact_name}!<br /><br />Paldies par maksājumu! <br /><br />Maksājuma informāciju varat skatīt, izmantojot šo saiti: <a href="{payment_guest_link}">{payment_date}</a>.<br /><br />Sazinieties ar mums par visiem jautājumiem.<br /><br />Labākie vēlējumi,<br />{company_name}',
     ],
 
-    'payment_new_vendor' => [
-        'subject'       => 'Maksājums izveidots:{revenue_date}',
-        'body'          => 'Cien., {vendor_name},<br /><br />Esam sagatavojuši šādu maksājumu. <br /><br />Maksājuma informāciju varat skatīt šajā saitē: <a href="{payment_admin_link}">{payment_date}</a>.<br /><br />Varat sazināties ar mums, uzdodot jebkādus jautājumus..<br /><br />Labākie vēlējumi,<br />{company_name}',
+    'payment_made_vendor' => [
+        'subject'       => 'Maksājumu veicis {company_name}',
+        'body'          => 'Cien. {contact_name}!<br /><br />Mēs esam veikuši šādu maksājumu. <br /><br />Maksājuma informāciju varat skatīt, izmantojot šo saiti: <a href="{payment_guest_link}">{payment_date}</a>.<br /><br />Sazinieties ar mums par visiem jautājumiem.<br /><br />Labākie vēlējumi,<br />{company_name}',
     ],
 ];

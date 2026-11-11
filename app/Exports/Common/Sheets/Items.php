@@ -3,10 +3,13 @@
 namespace App\Exports\Common\Sheets;
 
 use App\Abstracts\Export;
+use App\Http\Requests\Common\Item as Request;
 use App\Models\Common\Item as Model;
 
 class Items extends Export
 {
+    public $request_class = Request::class;
+
     public function collection()
     {
         return Model::with('category')->collectForExport($this->ids);
@@ -23,6 +26,7 @@ class Items extends Export
     {
         return [
             'name',
+            'type',
             'description',
             'sale_price',
             'purchase_price',

@@ -5,7 +5,7 @@ namespace App\BulkActions\Purchases;
 use App\Abstracts\BulkAction;
 use App\Events\Document\DocumentCancelled;
 use App\Events\Document\DocumentReceived;
-use App\Exports\Purchases\Bills as Export;
+use App\Exports\Purchases\Bills\Bills as Export;
 use App\Jobs\Banking\CreateBankingDocumentTransaction;
 use App\Jobs\Document\CreateDocumentHistory;
 use App\Jobs\Document\DeleteDocument;
@@ -15,45 +15,58 @@ class Bills extends BulkAction
 {
     public $model = Document::class;
 
+    public $text = 'general.bills';
+
+    public $path = [
+        'group' => 'purchases',
+        'type' => 'bills',
+    ];
+
     public $actions = [
-        'paid' => [
-            'name' => 'bills.mark_paid',
-            'message' => 'bulk_actions.message.paid',
-            'permission' => 'update-purchases-bills',
+        'edit' => [
+            'icon'          => 'edit',
+            'name'          => 'general.edit',
+            'message'       => '',
+            'permission'    => 'update-purchases-bills',
+            'type'          => 'modal',
+            'handle'        => 'update',
         ],
-        'received' => [
-            'name' => 'bills.mark_received',
-            'message' => 'bulk_actions.message.received',
-            'permission' => 'update-purchases-bills',
+        'received'  => [
+            'icon'          => 'send',
+            'name'          => 'bills.mark_received',
+            'message'       => 'bulk_actions.message.received',
+            'permission'    => 'update-purchases-bills',
         ],
         'cancelled' => [
-            'name' => 'general.cancel',
-            'message' => 'bulk_actions.message.cancelled',
-            'permission' => 'update-purchases-bills',
+            'icon'          => 'cancel',
+            'name'          => 'documents.actions.cancel',
+            'message'       => 'bulk_actions.message.cancelled',
+            'permission'    => 'update-purchases-bills',
         ],
-        'delete' => [
-            'name' => 'general.delete',
-            'message' => 'bulk_actions.message.delete',
-            'permission' => 'delete-purchases-bills',
+        'delete'    => [
+            'icon'          => 'delete',
+            'name'          => 'general.delete',
+            'message'       => 'bulk_actions.message.delete',
+            'permission'    => 'delete-purchases-bills',
         ],
-        'export' => [
-            'name' => 'general.export',
-            'message' => 'bulk_actions.message.export',
-            'type' => 'download',
+        'export'    => [
+            'icon'          => 'file_download',
+            'name'          => 'general.export',
+            'message'       => 'bulk_actions.message.export',
+            'type'          => 'download',
         ],
     ];
 
-    public function paid($request)
+    public function edit($request)
     {
-        $bills = $this->getSelectedRecords($request);
+        $selected = $this->getSelectedInput($request);
 
-        foreach ($bills as $bill) {
-            if ($bill->status == 'paid') {
-                continue;
-            }
+        return $this->response('bulk-actions.purchases.bills.edit', compact('selected'));
+    }
 
-            $this->dispatch(new CreateBankingDocumentTransaction($bill, ['type' => 'expense']));
-        }
+    public function update($request)
+    {
+        $this->updateDocuments($request);
     }
 
     public function received($request)
@@ -74,7 +87,7 @@ class Bills extends BulkAction
         $bills = $this->getSelectedRecords($request);
 
         foreach ($bills as $bill) {
-            if ($bill->status == 'cancelled') {
+            if (! $bill->isAccrued()) {
                 continue;
             }
 

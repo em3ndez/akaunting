@@ -4,8 +4,9 @@ namespace Tests\Feature\Common;
 
 use App\Models\Common\Widget;
 use App\Models\Common\Dashboard;
-use Tests\Feature\FeatureTestCase;
 use App\Jobs\Common\CreateDashboard;
+use App\Utilities\Widgets;
+use Tests\Feature\FeatureTestCase;
 
 class DashboardsTest extends FeatureTestCase
 {
@@ -44,6 +45,18 @@ class DashboardsTest extends FeatureTestCase
         $this->assertFlashLevel('success');
 
         $this->assertDatabaseHas('dashboards', $this->getAssertRequest($request));
+    }
+
+    public function testItShouldNotCreateDashboardWithInvalidUser()
+    {
+        $request = $this->getRequest();
+        $request['users'] = [99999];
+
+        $this->withExceptionHandling()
+            ->loginAs()
+            ->postJson(route('dashboards.store'), $request)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['users.0']);
     }
 
     public function testItShouldSeeDashboardUpdatePage()
@@ -94,13 +107,12 @@ class DashboardsTest extends FeatureTestCase
 
     public function testItShouldSeeWidgetCreate()
     {
-        $classes = Widget::factory()->classes;
-        $class = $classes[rand(0, 9)];
+        $class = Widgets::$core_widgets[array_rand(Widgets::$core_widgets)];
 
         $this->loginAs()
             ->get(route('widgets.index'))
             ->assertOk()
-            ->assertSeeText((new $class())->getDefaultName());
+            ->assertSeeText((new $class())->getDefaultName(), false);
     }
 
     public function testItShouldSeeWidgetEdit()
@@ -122,6 +134,18 @@ class DashboardsTest extends FeatureTestCase
             ->assertOk();
 
         $this->assertDatabaseHas('widgets', $this->getAssertRequest($request));
+    }
+
+    public function testItShouldNotCreateWidgetWithInvalidDashboard()
+    {
+        $request = $this->getWidget();
+        $request['dashboard_id'] = 99999;
+
+        $this->withExceptionHandling()
+            ->loginAs()
+            ->postJson(route('widgets.store'), $request)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['dashboard_id']);
     }
 
     public function testItShouldUpdateWidget()

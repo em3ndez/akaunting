@@ -7,7 +7,7 @@ use Illuminate\Support\Str;
 
 class DocumentItem extends FormRequest
 {
-    protected $quantity_size = 5;
+    protected $quantity_size = 10;
 
     /**
      * Get the validation rules that apply to the request.
@@ -17,13 +17,15 @@ class DocumentItem extends FormRequest
     public function rules()
     {
         if (Str::contains($this->request->get('quantity'), ['.', ','])) {
-            $this->quantity_size = 7;
+            $this->quantity_size = 12;
         }
+
+        $company_id = (int) $this->request->get('company_id', company_id());
 
         return [
             'type' => 'required|string',
-            'document_id' => 'required|integer',
-            'name' => 'required|string',
+            'document_id' => 'required|integer|exists:documents,id,company_id,' . $company_id . ',deleted_at,NULL',
+            'name' => 'required|string|max:255',
             'quantity' => 'required|max:' . $this->quantity_size,
             'price' => 'required|amount',
             'total' => 'required',

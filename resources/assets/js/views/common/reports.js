@@ -15,46 +15,57 @@ import Global from './../../mixins/global';
 import Form from './../../plugins/form';
 import BulkAction from './../../plugins/bulk-action';
 
+import ReportFilter from './../../components/Reports/ReportFilter';
+
 // plugin setup
 Vue.use(DashboardPlugin);
 
 const app = new Vue({
-    el: '#app',
+    el: '#main-body',
 
     mixins: [
-        Global
+        Global,
     ],
+
+    components: {
+        ReportFilter,
+    },
 
     data: function () {
         return {
             form: new Form('report'),
             bulk_action: new BulkAction('reports'),
             report_fields: '',
-            reports_total: [],
-        }
-    },
-
-    created() {
-        if (typeof reports_total !== 'undefined' && reports_total) {
-            this.reports_total = reports_total;
+            showPreferences: false,
         }
     },
 
     methods: {
         onChangeClass(class_name) {
+            if (! class_name) {
+                this.report_fields = '';
+
+                return;
+            }
+
             axios.get(url + '/common/reports/fields', {
                 params: {
                     class: class_name
                 }
-              })
+            })
             .then(response => {
+                if (class_name) {
+                    this.showPreferences = true;
+                } else {
+                    this.showPreferences = false;
+                }
+
                 let form = this.form;
                 let html = response.data.html;
 
                 this.report_fields = Vue.component('add-new-component', (resolve, reject) => {
                     resolve({
-                        template : '<div id="report-fields" class="row col-md-12">' + html + '</div>',
-
+                        template : '<div id="report-fields" class="grid sm:grid-cols-6 sm:col-span-6  gap-x-8 gap-y-6 my-3.5">' + html + '</div>',
                         mixins: [
                             Global
                         ],
@@ -83,15 +94,6 @@ const app = new Vue({
 
         onChangeReportFields(event) {
             this.form = event;
-        },
-
-        onRefreshTotal(report_id) {
-            axios.get(url + '/common/reports/' + report_id + '/clear')
-            .then(response => {
-                this.reports_total[report_id] = response.data.data;
-            })
-            .catch(error => {
-            });
         },
     }
 });

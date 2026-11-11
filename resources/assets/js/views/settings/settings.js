@@ -25,12 +25,6 @@ const app = new Vue({
         Global
     ],
 
-    mounted() {
-        this.onChangeProtocol(this.form.protocol);
-
-        this.color = this.form.color;
-    },
-
     data: function () {
         return {
             form: new Form('setting'),
@@ -43,6 +37,8 @@ const app = new Vue({
                 smtpPassword:true,
                 smtpEncryption:true,
             },
+            tags: null,
+            template_title: '',
 
             invoice_form: new Form('template'),
             template: {
@@ -52,17 +48,9 @@ const app = new Vue({
                 html: '',
                 errors: new Error()
             },
-
-            color: '#55588b',
-            predefineColors: [
-                '#3c3f72',
-                '#55588b',
-                '#e5e5e5',
-                '#328aef',
-                '#efad32',
-                '#ef3232',
-                '#efef32'
-            ],
+            item_name_input: false,
+            price_name_input: false,
+            quantity_name_input: false,
         }
     },
 
@@ -108,7 +96,7 @@ const app = new Vue({
             ];
 
             for (const [key, value] of Object.entries(this.form)) {
-                if (!skips.includes(key)) {
+                if (! skips.includes(key)) {
                     this.invoice_form[key] = value;
                 }
             }
@@ -118,7 +106,6 @@ const app = new Vue({
 
         addTemplate() {
             if (this.invoice_form.template != 1) {
-
                 this.invoice_form.submit();
 
                 this.template.errors = this.invoice_form.errors;
@@ -138,12 +125,57 @@ const app = new Vue({
             };
         },
 
-        onChangeColor() {
-            this.form.color = this.color;
+        onEditEmailTemplate(template_id) {
+            axios.get(url + '/settings/email-templates/get', {
+                params: {
+                    id: template_id
+                }
+            })
+            .then(response => {
+                this.template_title = response.data.data.title;
+
+                this.form.subject = response.data.data.subject;
+                this.form.body = response.data.data.body;
+                this.form.id = response.data.data.id;
+
+                this.tags = response.data.data.tags;
+            });
         },
 
-        onChangeColorInput() {
-            this.color = this.form.color;
-        }
+        // Change currency get money override because remove form currency_code and currency_rate column
+        onChangeCurrency(currency_code) {
+            if (! currency_code) {
+                return;
+            }
+
+            if (! this.all_currencies.length) {
+                let currency_promise = Promise.resolve(window.axios.get((url + '/settings/currencies')));
+
+                currency_promise.then(response => {
+                    if (response.data.success) {
+                        this.all_currencies = response.data.data;
+                    }
+
+                    this.all_currencies.forEach(function (currency, index) {
+                        if (currency_code == currency.code) {
+                            this.currency = currency;
+
+                            this.form.currency = currency.code;
+                        }
+                    }, this);
+                })
+                .catch(error => {
+                    this.onChangeCurrency(currency_code);
+                });
+            } else {
+                this.all_currencies.forEach(function (currency, index) {
+                    if (currency_code == currency.code) {
+                        this.currency = currency;
+
+                        this.form.currency = currency.code;
+                    }
+                }, this);
+            }
+        },
     }
 });

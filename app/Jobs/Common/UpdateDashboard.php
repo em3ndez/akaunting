@@ -3,6 +3,7 @@
 namespace App\Jobs\Common;
 
 use App\Abstracts\Job;
+use App\Exceptions\Job\NotAllowed;
 use App\Interfaces\Job\ShouldUpdate;
 use App\Models\Common\Dashboard;
 use App\Traits\Users;
@@ -32,7 +33,7 @@ class UpdateDashboard extends Job implements ShouldUpdate
     public function authorize(): void
     {
         // Can't disable last dashboard for any shared user
-        if ($this->request->has('enabled') && !$this->request->get('enabled')) {
+        if ($this->request->has('enabled') && ! $this->request->get('enabled')) {
             foreach ($this->model->users as $user) {
                 if ($user->dashboards()->enabled()->count() > 1) {
                     continue;
@@ -40,7 +41,7 @@ class UpdateDashboard extends Job implements ShouldUpdate
 
                 $message = trans('dashboards.error.disable_last');
 
-                throw new \Exception($message);
+                throw new NotAllowed($message);
             }
         }
 
@@ -50,7 +51,7 @@ class UpdateDashboard extends Job implements ShouldUpdate
             if (!in_array($user->id, (array) $this->request->get('users')) && ($user->dashboards()->enabled()->count() == 1)) {
                 $message = trans('dashboards.error.delete_last');
 
-                throw new \Exception($message);
+                throw new NotAllowed($message);
             }
         }
 
@@ -58,7 +59,7 @@ class UpdateDashboard extends Job implements ShouldUpdate
         if ($this->isNotUserDashboard($this->model->id)) {
             $message = trans('dashboards.error.not_user_dashboard');
 
-            throw new \Exception($message);
+            throw new NotAllowed($message);
         }
     }
 }

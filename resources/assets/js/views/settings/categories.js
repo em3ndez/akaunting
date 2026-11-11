@@ -15,50 +15,20 @@ import Global from './../../mixins/global';
 import Form from './../../plugins/form';
 import BulkAction from './../../plugins/bulk-action';
 
-import {ColorPicker} from 'element-ui';
-
 // plugin setup
-Vue.use(DashboardPlugin, ColorPicker);
+Vue.use(DashboardPlugin);
 
 const app = new Vue({
     el: '#app',
 
     mixins: [
-        Global
+        Global,
     ],
-
-    components: {
-        [ColorPicker.name]: ColorPicker,
-    },
-
-    mounted() {
-        this.color = this.form.color;
-    },
 
     data: function () {
         return {
             form: new Form('category'),
             bulk_action: new BulkAction('categories'),
-            color: '#55588b',
-            predefineColors: [
-                '#3c3f72',
-                '#55588b',
-                '#e5e5e5',
-                '#328aef',
-                '#efad32',
-                '#ef3232',
-                '#efef32'
-            ]
         }
     },
-
-    methods: {
-        onChangeColor() {
-            this.form.color = this.color;
-        },
-
-        onChangeColorInput() {
-            this.color = this.form.color;
-        }
-    }
 });

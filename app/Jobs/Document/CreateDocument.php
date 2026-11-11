@@ -5,19 +5,34 @@ namespace App\Jobs\Document;
 use App\Abstracts\Job;
 use App\Events\Document\DocumentCreated;
 use App\Events\Document\DocumentCreating;
+use App\Exceptions\Job\NotAllowed;
 use App\Interfaces\Job\HasOwner;
 use App\Interfaces\Job\HasSource;
 use App\Interfaces\Job\ShouldCreate;
 use App\Jobs\Document\CreateDocumentItemsAndTotals;
 use App\Models\Document\Document;
+use App\Traits\Plans;
 use Illuminate\Support\Str;
 
 class CreateDocument extends Job implements HasOwner, HasSource, ShouldCreate
 {
+    use Plans;
+
     public function handle(): Document
     {
-        if (empty($this->request['amount'])) {
-            $this->request['amount'] = 0;
+        $this->authorize();
+
+        // Derived from the lines by CreateDocumentItemsAndTotals, never taken from the caller
+        $this->request['amount'] = 0;
+
+        // Disable this lines for global discount issue fixed ( https://github.com/akaunting/akaunting/issues/2797 )
+        if (! empty($this->request['discount'])) {
+            $this->request['discount_rate'] = $this->request['discount'];
+
+            // A discount without a type is worked out as an amount, so it is stored as one
+            if (empty($this->request['discount_type'])) {
+                $this->request['discount_type'] = 'fixed';
+            }
         }
 
         event(new DocumentCreating($this->request));
@@ -44,5 +59,16 @@ class CreateDocument extends Job implements HasOwner, HasSource, ShouldCreate
         event(new DocumentCreated($this->model, $this->request));
 
         return $this->model;
+    }
+
+    /**
+     * Determine if this action is applicable.
+     */
+    public function authorize(): void
+    {
+        $limit = $this->getAnyActionLimitOfPlan();
+        if (! $limit->action_status && ! empty($this->request['type']) && ($this->request['type'] == 'invoice')) {
+            throw new NotAllowed($limit->message);
+        }
     }
 }

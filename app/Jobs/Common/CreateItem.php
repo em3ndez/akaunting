@@ -3,6 +3,8 @@
 namespace App\Jobs\Common;
 
 use App\Abstracts\Job;
+use App\Events\Common\ItemCreated;
+use App\Events\Common\ItemCreating;
 use App\Interfaces\Job\HasOwner;
 use App\Interfaces\Job\HasSource;
 use App\Interfaces\Job\ShouldCreate;
@@ -13,6 +15,18 @@ class CreateItem extends Job implements HasOwner, HasSource, ShouldCreate
 {
     public function handle(): Item
     {
+        // Security: strip HTML tags from name to prevent stored XSS in delete
+        // confirmation modal (CVE-2026-11942). The delete modal renders model
+        // name via v-html; e() in getMessage() provides output encoding, but
+        // this strips HTML at the source as defense-in-depth.
+        if ($this->request->has('name')) {
+            $this->request->merge([
+                'name' => strip_tags($this->request->get('name')),
+            ]);
+        }
+
+        event(new ItemCreating($this->request));
+
         \DB::transaction(function () {
             $this->model = Item::create($this->request->all());
 
@@ -25,6 +39,8 @@ class CreateItem extends Job implements HasOwner, HasSource, ShouldCreate
 
             $this->dispatch(new CreateItemTaxes($this->model, $this->request));
         });
+
+        event(new ItemCreated($this->model, $this->request));
 
         return $this->model;
     }

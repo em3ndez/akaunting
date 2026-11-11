@@ -6,10 +6,13 @@ use App\Abstracts\Job;
 use App\Events\Document\PaidAmountCalculated;
 use App\Events\Document\DocumentUpdated;
 use App\Events\Document\DocumentUpdating;
+use App\Exceptions\Job\NotAllowed;
 use App\Interfaces\Job\ShouldUpdate;
 use App\Jobs\Document\CreateDocumentItemsAndTotals;
 use App\Models\Document\Document;
 use App\Traits\Relationships;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class UpdateDocument extends Job implements ShouldUpdate
@@ -18,13 +21,38 @@ class UpdateDocument extends Job implements ShouldUpdate
 
     public function handle(): Document
     {
-        if (empty($this->request['amount'])) {
-            $this->request['amount'] = 0;
+        $this->authorize();
+
+        // An absent items key is a partial update; rebuilding from it would force delete the lines
+        $has_items = $this->request->has('items');
+
+        if ($has_items) {
+            // Read afresh: a copy loaded earlier can be stale, e.g. read before the lines were created, and both
+            // the DocumentUpdating listeners and deleteRelationships() act on the loaded copy
+            $this->model->load(['items', 'item_taxes', 'totals']);
+
+            $this->preserveExistingTaxRates();
+        }
+
+        // Derived from the lines, never taken from the caller
+        $this->request['amount'] = $has_items ? 0 : $this->model->amount;
+
+        // Disable this lines for global discount issue fixed ( https://github.com/akaunting/akaunting/issues/2797 )
+        if ($this->request->has('discount')) {
+            $this->request['discount_rate'] = $this->request['discount'];
+
+            // A discount without a type is worked out as an amount, so it is stored as one
+            if (! empty($this->request['discount']) && empty($this->request['discount_type'])) {
+                $this->request['discount_type'] = 'fixed';
+            }
         }
 
         event(new DocumentUpdating($this->model, $this->request));
 
-        \DB::transaction(function () {
+        // Track original contact_id to sync transactions if it changes
+        $originalContactId = $this->model->contact_id;
+
+        DB::transaction(function () use ($originalContactId, $has_items) {
             // Upload attachment
             if ($this->request->file('attachment')) {
                 $this->deleteMediaModel($this->model, 'attachment', $this->request);
@@ -34,32 +62,45 @@ class UpdateDocument extends Job implements ShouldUpdate
 
                     $this->model->attachMedia($media, 'attachment');
                 }
-            } elseif (!$this->request->file('attachment') && $this->model->attachment) {
+            } elseif ($this->request->isNotApi() && ! $this->request->file('attachment') && $this->model->attachment) {
+                $this->deleteMediaModel($this->model, 'attachment', $this->request);
+            } elseif ($this->request->isApi() && $this->request->has('remove_attachment') && $this->model->attachment) {
                 $this->deleteMediaModel($this->model, 'attachment', $this->request);
             }
 
-            $this->deleteRelationships($this->model, ['items', 'item_taxes', 'totals'], true);
+            if ($has_items) {
+                $this->deleteRelationships($this->model, ['items', 'item_taxes', 'totals'], true);
 
-            $this->dispatch(new CreateDocumentItemsAndTotals($this->model, $this->request));
+                $this->dispatch(new CreateDocumentItemsAndTotals($this->model, $this->request));
+            }
 
             $this->model->paid_amount = $this->model->paid;
 
             event(new PaidAmountCalculated($this->model));
 
             if ($this->model->paid_amount > 0) {
-                if ($this->request['amount'] == $this->model->paid_amount) {
-                    $this->request['status'] = 'paid';
-                }
+                // Rounded before comparing, otherwise a float cent keeps a settled document partial
+                $currency_code = $this->request['currency_code'] ?? $this->model->currency_code;
+                $precision = currency($currency_code)->getPrecision();
 
-                if ($this->request['amount'] > $this->model->paid_amount) {
-                    $this->request['status'] = 'partial';
-                }
+                $amount = round((float) $this->request['amount'], $precision);
+                $paid = round((float) $this->model->paid_amount, $precision);
+
+                // At or below what was already paid counts as settled, including an overpayment
+                $this->request['status'] = ($amount > $paid) ? 'partial' : 'paid';
             }
 
             unset($this->model->reconciled);
             unset($this->model->paid_amount);
 
-            $this->model->update($this->request->all());
+            $this->model->update($this->getUpdatePayload());
+
+            // Sync transaction contact_id if document contact changed (skip reconciled transactions)
+            if (isset($this->request['contact_id']) && $originalContactId != $this->request['contact_id']) {
+                $this->model->transactions()->where('reconciled', 0)->update([
+                    'contact_id' => $this->request['contact_id'],
+                ]);
+            }
 
             $this->model->updateRecurring($this->request->all());
         });
@@ -67,5 +108,90 @@ class UpdateDocument extends Job implements ShouldUpdate
         event(new DocumentUpdated($this->model, $this->request));
 
         return $this->model;
+    }
+
+    /**
+     * Preserve stored line tax rates when the client does not submit tax_rates.
+     */
+    protected function preserveExistingTaxRates(): void
+    {
+        if ($this->request->boolean('recalculate_taxes')) {
+            return;
+        }
+
+        $items = (array) $this->request->input('items', []);
+
+        if (empty($items)) {
+            return;
+        }
+
+        $existingItems = $this->model->items()->with('taxes')->get()->values();
+
+        foreach ($items as $index => &$item) {
+            if (! empty($item['tax_rates']) || empty($item['tax_ids'])) {
+                continue;
+            }
+
+            $existingItem = $existingItems->get((int) $index);
+
+            if (! $existingItem) {
+                continue;
+            }
+
+            $existingRates = $existingItem->taxes->pluck('rate', 'tax_id')->all();
+
+            if (empty($existingRates)) {
+                continue;
+            }
+
+            $matchedRates = [];
+
+            foreach ((array) $item['tax_ids'] as $taxId) {
+                if (array_key_exists($taxId, $existingRates)) {
+                    $matchedRates[$taxId] = $existingRates[$taxId];
+                }
+            }
+
+            if (! empty($matchedRates)) {
+                $item['tax_rates'] = $matchedRates;
+            }
+        }
+
+        unset($item);
+
+        $this->request->merge(['items' => $items]);
+    }
+
+    /**
+     * The attributes an update may write, without the ones that identify the document.
+     */
+    protected function getUpdatePayload(): array
+    {
+        return Arr::except($this->request->all(), ['company_id', 'type', 'parent_id']);
+    }
+
+    /**
+     * Determine if this action is applicable.
+     */
+    public function authorize(): void
+    {
+        if (
+            isset($this->request['contact_id']) &&
+            (int) $this->request['contact_id'] !== (int) $this->model->contact_id
+        ) {
+            $lockedStatuses = ['sent', 'received', 'viewed', 'partial', 'paid', 'overdue', 'unpaid', 'cancelled'];
+
+            if (in_array($this->model->status, $lockedStatuses)) {
+                $type = Str::plural($this->model->type);
+                $message = trans('messages.warning.contact_change', ['type' => trans_choice("general.$type", 1)]);
+
+                throw new NotAllowed($message);
+            } else if ($this->model->transactions()->isReconciled()->exists()) {
+                $type = Str::plural($this->model->type);
+                $message = trans('messages.warning.reconciled_doc', ['type' => trans_choice("general.$type", 1)]);
+
+                throw new NotAllowed($message);
+            }
+        }
     }
 }

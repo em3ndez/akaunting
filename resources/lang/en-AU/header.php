@@ -6,7 +6,7 @@ return [
     'last_login'            => 'Last login :time',
 
     'notifications' => [
-        'counter'           => '{0} You have no notification|{1} You have :count notification|[2,*] You have :count notifications',
+        'counter'           => '{0} You have no new notifications|{1} You have :count new notification|[2,*] You have :count new notifications',
         'new_apps'          => '{1} :count new app is published|[2,*] :count new apps published',
         'overdue_invoices'  => '{1} :count overdue invoice|[2,*] :count overdue invoices',
         'upcoming_bills'    => '{1} :count upcoming bill|[2,*] :count upcoming bills',
@@ -24,5 +24,10 @@ return [
 
     'docs_link'             => 'https://akaunting.com/docs',
     'support_link'          => 'https://akaunting.com/support',
+
+    'favorite' => [
+        'added_favorite'    => 'Added to favourites',
+        'add_favorite'      => 'Add to favourites',
+    ],
 
 ];

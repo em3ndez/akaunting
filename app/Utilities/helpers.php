@@ -1,12 +1,17 @@
 <?php
 
 use App\Models\Common\Company;
+use App\Traits\Cloud;
 use App\Traits\DateTime;
 use App\Traits\Sources;
+use App\Traits\Modules;
+use App\Traits\SearchString;
 use App\Utilities\Date;
 use App\Utilities\Widgets;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
-if (!function_exists('user')) {
+if (! function_exists('user')) {
     /**
      * Get the authenticated user.
      *
@@ -14,58 +19,55 @@ if (!function_exists('user')) {
      */
     function user()
     {
-        // Get user from api/web
-        if (request()->isApi()) {
-            $user = app('Dingo\Api\Auth\Auth')->user();
-        } else {
-            $user = auth()->user();
-        }
-
-        return $user;
+        return auth()->user();
     }
 }
 
-if (!function_exists('user_id')) {
+if (! function_exists('user_id')) {
     /**
      * Get id of current user.
-     *
-     * @return int
      */
-    function user_id()
+    function user_id(): int|null
     {
-        return optional(user())->id;
+        return user()?->id;
     }
 }
 
-if (!function_exists('company_date_format')) {
+if (! function_exists('company_date_format')) {
     /**
      * Get the date format of company.
-     *
-     * @return string
      */
-    function company_date_format()
+    function company_date_format(): string
     {
-        $date_time = new class() {
-            use DateTime;
-        };
+        $date_time = new class() { use DateTime; };
 
         return $date_time->getCompanyDateFormat();
     }
 }
 
-if (!function_exists('company_date')) {
+if (! function_exists('company_date')) {
     /**
      * Format the given date based on company settings.
-     *
-     * @return string
      */
-    function company_date($date)
+    function company_date($date): string
     {
         return Date::parse($date)->format(company_date_format());
     }
 }
 
-if (!function_exists('show_widget')) {
+if (! function_exists('list_limit')) {
+    /**
+     * Get the page size of a listing, capped by the configured maximum for api callers.
+     */
+    function list_limit(): int
+    {
+        $limit = (int) request()->get('limit', setting('default.list_limit', '25'));
+
+        return request()->isApi() ? min($limit, (int) config('api.list_limit')) : $limit;
+    }
+}
+
+if (! function_exists('show_widget')) {
     /**
      * Show a widget.
      *
@@ -81,15 +83,11 @@ if (!function_exists('show_widget')) {
     }
 }
 
-if (!function_exists('company')) {
+if (! function_exists('company')) {
     /**
      * Get current/any company model.
-     *
-     * @param int|null $id
-     *
-     * @return Company|null
      */
-    function company($id = null)
+    function company(int|null $id = null): Company|null
     {
         $company = null;
 
@@ -105,67 +103,537 @@ if (!function_exists('company')) {
     }
 }
 
-if (!function_exists('company_id')) {
+if (! function_exists('module_is_enabled')) {
     /**
-     * Get id of current company.
-     *
-     * @return int
+     * Check if a module is enabled.
      */
-    function company_id()
+    function module_is_enabled(string $alias): bool
     {
-        return optional(company())->id;
+        $module = new class() { use Modules; };
+
+        return $module->moduleIsEnabled($alias);
     }
 }
 
-if (!function_exists('should_queue')) {
+if (! function_exists('company_id')) {
+    /**
+     * Get id of current company.
+     */
+    function company_id(): int|null
+    {
+        return company()?->id;
+    }
+}
+
+if (! function_exists('team')) {
+    /**
+     * Get team of current company.
+     */
+    function team()
+    {
+        return company()?->team() !== null ? company()?->team() : company()?->owner?->team();
+    }
+}
+
+if (! function_exists('team_id')) {
+    /**
+     * Get id of current company team.
+     */
+    function team_id()
+    {
+        return team()?->id;
+    }
+}
+
+if (! function_exists('should_queue')) {
     /**
      * Check if queue is enabled.
-     *
-     * @return bool
      */
-    function should_queue() {
+    function should_queue(): bool
+    {
         return config('queue.default') != 'sync';
     }
 }
 
-if (!function_exists('source_name')) {
+if (! function_exists('source_name')) {
     /**
      * Get the current source.
-     *
-     * @param string|null $alias
-     *
-     * @return string
      */
-    function source_name($alias = null)
+    function source_name(string|null $alias = null): string
     {
-        $tmp = new class() {
-            use Sources;
-        };
+        $tmp = new class() { use Sources; };
 
         return $tmp->getSourceName(null, $alias);
     }
 }
 
-if (!function_exists('cache_prefix')) {
+if (! function_exists('cache_prefix')) {
     /**
      * Cache system added company_id prefix.
-     *
-     * @return string
      */
-    function cache_prefix()
+    function cache_prefix(): string
     {
         return company_id() . '_';
     }
 }
 
-if (!function_exists('running_in_queue')) {
+if (! function_exists('array_values_recursive')) {
+    /**
+     * Get array values recursively.
+     */
+    function array_values_recursive(array $array): array
+    {
+        $flat = [];
+
+        foreach($array as $value) {
+            if (is_array($value)) {
+                $flat = array_merge($flat, array_values_recursive($value));
+            } else {
+                $flat[] = $value;
+            }
+        }
+
+        return $flat;
+    }
+}
+
+if (! function_exists('running_in_install')) {
     /**
      * Detect if application is running in queue.
-     *
-     * @return bool
      */
-    function running_in_queue()
+    function running_in_install(): bool
     {
-        return defined('APP_RUNNING_IN_QUEUE') ?? false;
+        return request_is_install() && config('app.installed', false) == false;
+    }
+}
+
+if (! function_exists('running_in_queue')) {
+    /**
+     * Detect if application is running in queue.
+     */
+    function running_in_queue(): bool
+    {
+        return app()->runningConsoleCommand([
+            'queue:work',
+            'queue:listen',
+            'horizon',
+        ]);
+    }
+}
+
+if (! function_exists('running_in_schedule')) {
+    /**
+     * Detect if application is running in schedule.
+     */
+    function running_in_schedule(): bool
+    {
+        return app()->runningConsoleCommand([
+            'schedule:run',
+            'schedule:work',
+        ]);
+    }
+}
+
+if (! function_exists('running_in_test')) {
+    /**
+     * Detect if application is running in test.
+     */
+    function running_in_test(): bool
+    {
+        return env_is_testing() && app()->runningInConsole();
+    }
+}
+
+if (! function_exists('simple_icons')) {
+    /**
+     * Get the simple icon content
+     */
+    function simple_icons(string $name): string
+    {
+        $path = base_path('vendor/simple-icons/simple-icons/icons/' . $name . '.svg');
+
+        return file_get_contents($path);
+    }
+}
+
+if (! function_exists('default_currency')) {
+    /**
+     * Get the default currency code
+     */
+    function default_currency(): string
+    {
+        return setting('default.currency');
+    }
+}
+
+if (! function_exists('env_is_production')) {
+    /**
+     * Determine if the application is in the production environment
+     */
+    function env_is_production(): bool
+    {
+        return config('app.env') === 'production';
+    }
+}
+
+if (! function_exists('env_is_development')) {
+    /**
+     * Determine if the application is in the development environment
+     */
+    function env_is_development(): bool
+    {
+        return config('app.env') === 'development';
+    }
+}
+
+if (! function_exists('env_is_build')) {
+    /**
+     * Determine if the application is in the build environment
+     */
+    function env_is_build(): bool
+    {
+        return config('app.env') === 'build';
+    }
+}
+
+if (! function_exists('env_is_local')) {
+    /**
+     * Determine if the application is in the local environment
+     */
+    function env_is_local(): bool
+    {
+        return config('app.env') === 'local';
+    }
+}
+
+if (! function_exists('env_is_testing')) {
+    /**
+     * Determine if the application is in the testing environment
+     */
+    function env_is_testing(): bool
+    {
+        return config('app.env') === 'testing';
+    }
+}
+
+if (! function_exists('is_local_storage')) {
+    /**
+     * Determine if the storage is local.
+     */
+    function is_local_storage(): bool
+    {
+        $driver = config('filesystems.disks.' . config('filesystems.default') . '.driver');
+
+        return $driver == 'local';
+    }
+}
+
+if (! function_exists('is_cloud_storage')) {
+    /**
+     * Determine if the storage is cloud.
+     */
+    function is_cloud_storage(): bool
+    {
+        return ! is_local_storage();
+    }
+}
+
+if (! function_exists('get_storage_path')) {
+    /**
+     * Get the path from the storage.
+     */
+    function get_storage_path(string $path = ''): string
+    {
+        return is_local_storage()
+                ? storage_path($path)
+                : Storage::path($path);
+    }
+}
+
+if (! function_exists('user_model_class')) {
+    function user_model_class(): string
+    {
+        return config('auth.providers.users.model');
+    }
+}
+
+if (! function_exists('role_model_class')) {
+    function role_model_class(): string
+    {
+        return config('laratrust.models.role');
+    }
+}
+
+if (! function_exists('team_model_class')) {
+    function team_model_class(): string
+    {
+        return config('laratrust.models.team');
+    }
+}
+
+if (! function_exists('search_string_value')) {
+    function search_string_value(string $name, string $default = '', string $input = ''): string|array
+    {
+        $search = new class() { use SearchString; };
+
+        return $search->getSearchStringValue($name, $default, $input);
+    }
+}
+
+if (! function_exists('is_cloud')) {
+    function is_cloud(): bool
+    {
+        $cloud = new class() { use Cloud; };
+
+        return $cloud->isCloud();
+    }
+}
+
+if (! function_exists('request_is_install')) {
+    function request_is_install(Request|null $request = null): bool
+    {
+        $r = $request ?: request();
+
+        return $r->is('install/*');
+    }
+}
+
+if (! function_exists('request_is_api')) {
+    function request_is_api(Request|null $request = null): bool
+    {
+        $r = $request ?: request();
+
+        return $r->is(config('api.prefix') . '/*');
+    }
+}
+
+if (! function_exists('request_is_mcp')) {
+    function request_is_mcp(Request|null $request = null): bool
+    {
+        $r = $request ?: request();
+
+        return $r->is('mcp') || $r->is('mcp/*');
+    }
+}
+
+if (! function_exists('request_is_oauth_api')) {
+    /**
+     * Returns true when the current request is an API call authenticated
+     * via an OAuth Bearer token (as set by AuthenticateOnceWithDynamicApi middleware).
+     */
+    function request_is_oauth_api(Request|null $request = null): bool
+    {
+        $r = $request ?: request();
+
+        return request_is_api($r) && $r->attributes->get('auth_method') === 'oauth';
+    }
+}
+
+if (! function_exists('request_is_auth')) {
+    function request_is_auth(Request|null $request = null): bool
+    {
+        $r = $request ?: request();
+
+        return $r->is('auth/*');
+    }
+}
+
+if (! function_exists('request_is_signed')) {
+    function request_is_signed(Request|null $request = null, int $company_id = null): bool
+    {
+        if (is_null($company_id)) {
+            return false;
+        }
+
+        $r = $request ?: request();
+
+        return $r->is($company_id . '/signed/*');
+    }
+}
+
+if (! function_exists('request_is_portal')) {
+    function request_is_portal(Request|null $request = null, int $company_id = null): bool
+    {
+        if (is_null($company_id)) {
+            return false;
+        }
+
+        $r = $request ?: request();
+
+        return $r->is($company_id . '/portal') || $r->is($company_id . '/portal/*');
+    }
+}
+
+if (! function_exists('calculation_to_quantity')) {
+    function calculation_to_quantity($quantity)
+    {
+        $quantity = trim((string) $quantity);
+
+        if ($quantity === '') {
+            throw new \InvalidArgumentException('Invalid mathematical expression.');
+        }
+
+        if (! preg_match('/^[0-9,+\-x*\/().\s]+$/', $quantity)) {
+            throw new \InvalidArgumentException('Invalid mathematical expression.');
+        }
+
+        // The expression comes straight from the item row of a document form, so it is
+        // capped in size and evaluated by a small parser here instead of eval(): user
+        // input never reaches the PHP compiler, and deep nesting cannot exhaust the stack.
+        if (strlen($quantity) > 255) {
+            throw new \InvalidArgumentException('Invalid mathematical expression.');
+        }
+
+        $quantity = str_replace(',', '.', $quantity);
+        $quantity = str_ireplace('x', '*', $quantity);
+
+        // "++" and "--" are matched as tokens of their own so that "2++2" stays an
+        // error, as it was when PHP parsed the expression, while "2 + +2" is allowed.
+        preg_match_all('/\s*(\*\*|\+\+|--|\d+(?:\.\d*)?|\.\d+|[-+*\/()])\s*/', $quantity, $matches);
+
+        if (implode('', $matches[0]) !== $quantity) {
+            throw new \InvalidArgumentException('Invalid mathematical expression.');
+        }
+
+        $tokens = $matches[1];
+        $position = 0;
+        $depth = 0;
+
+        $fail = function () {
+            throw new \InvalidArgumentException('Invalid mathematical expression.');
+        };
+
+        $peek = function () use (&$tokens, &$position) {
+            return $tokens[$position] ?? null;
+        };
+
+        $expression = $unary = null;
+
+        $primary = function () use (&$tokens, &$position, &$depth, &$expression, $peek, $fail) {
+            $token = $peek();
+
+            if ($token === '(') {
+                if (++$depth > 32) {
+                    $fail();
+                }
+
+                $position++;
+                $value = $expression();
+
+                if ($peek() !== ')') {
+                    $fail();
+                }
+
+                $position++;
+                $depth--;
+
+                return $value;
+            }
+
+            if ($token === null || ! is_numeric($token)) {
+                $fail();
+            }
+
+            $position++;
+
+            return str_contains($token, '.') ? (float) $token : (int) $token;
+        };
+
+        // Same precedence as PHP: "**" binds tighter than a unary sign and is right associative.
+        $power = function () use (&$position, &$unary, $primary, $peek) {
+            $base = $primary();
+
+            if ($peek() === '**') {
+                $position++;
+
+                return $base ** $unary();
+            }
+
+            return $base;
+        };
+
+        $unary = function () use (&$position, &$unary, $power, $peek) {
+            $token = $peek();
+
+            if ($token === '-' || $token === '+') {
+                $position++;
+                $value = $unary();
+
+                return $token === '-' ? -$value : +$value;
+            }
+
+            return $power();
+        };
+
+        $term = function () use (&$position, $unary, $peek) {
+            $value = $unary();
+
+            while (in_array($peek(), ['*', '/'], true)) {
+                $operator = $peek();
+                $position++;
+                $right = $unary();
+
+                $value = $operator === '*' ? $value * $right : $value / $right;
+            }
+
+            return $value;
+        };
+
+        $expression = function () use (&$position, $term, $peek) {
+            $value = $term();
+
+            while (in_array($peek(), ['+', '-'], true)) {
+                $operator = $peek();
+                $position++;
+                $right = $term();
+
+                $value = $operator === '+' ? $value + $right : $value - $right;
+            }
+
+            return $value;
+        };
+
+        try {
+            $result = $expression();
+
+            if ($position !== count($tokens)) {
+                $fail();
+            }
+        } catch (\InvalidArgumentException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            throw new \InvalidArgumentException('Error evaluating the expression: ' . $e->getMessage());
+        }
+
+        if (! is_numeric($result)) {
+            throw new \InvalidArgumentException('Invalid mathematical expression.');
+        }
+
+        return $result;
+    }
+}
+
+if (! function_exists('invoice_logo_size')) {
+    /**
+     * The width and height the logo is resized to on documents and transactions.
+     *
+     * A setting that is not a positive number, like a 0 or a field saved empty, falls back to
+     * the default: GD cannot make an image 0 pixels wide, and the invoice page failed on it.
+     *
+     * @return array{0: int, 1: int}
+     */
+    function invoice_logo_size(): array
+    {
+        $size = [];
+
+        foreach (['width', 'height'] as $side) {
+            $value = setting('invoice.logo_size_' . $side);
+
+            $size[] = (is_numeric($value) && (int) $value > 0)
+                ? (int) $value
+                : (int) config('setting.fallback.invoice.logo_size_' . $side, 128);
+        }
+
+        return $size;
     }
 }

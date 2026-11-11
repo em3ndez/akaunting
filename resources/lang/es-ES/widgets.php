@@ -2,23 +2,33 @@
 
 return [
 
-    'currencies'                => 'Divisas',
-    'total_income'              => 'Total Ingresos',
-    'receivables'               => 'Cuentas por cobrar',
-    'open_invoices'             => 'Facturas Pendientes',
-    'overdue_invoices'          => 'Facturas Vencidas',
-    'total_expenses'            => 'Total de Gastos',
-    'payables'                  => 'Cuentas por pagar',
-    'open_bills'                => 'Recibos Pendientes',
-    'overdue_bills'             => 'Recibos Vencidos',
-    'total_profit'              => 'Beneficio Total',
-    'open_profit'               => 'Beneficio Pendiente',
-    'overdue_profit'            => 'Beneficio Vencido',
-    'cash_flow'                 => 'Flujo de Efectivo',
-    'no_profit_loss'            => 'No hay pérdidas ganancias',
-    'income_by_category'        => 'Ingresos por Categoría',
-    'expenses_by_category'      => 'Gastos por Categoría',
+    'receivables'               => 'Cuentas a cobrar',
+    'payables'                  => 'Cuentas a pagar',
+    'cash_flow'                 => 'Flujo de caja',
+    'profit_loss'               => 'Pérdidas y ganancias',
+    'expenses_by_category'      => 'Gastos por categoría',
     'account_balance'           => 'Saldo de la cuenta',
-    'latest_income'             => 'Últimos ingresos',
-    'latest_expenses'           => 'Últimos gastos',
+    'bank_feeds'                => 'Conectar cuentas bancarias',
+    'currencies'                => 'Monedas',
+
+    'view_report'               => 'Ver informe',
+    'total_unpaid_invoices'     => 'Total de facturas no pagadas',
+    'total_unpaid_bills'        => 'Total de facturas de compra no pagadas',
+
+    'description' => [
+        'receivables'           => 'Importe pendiente de cobro de sus clientes',
+        'payables'              => 'Importe pendiente de pago a sus proveedores',
+        'cash_flow'             => 'Entradas y salidas de efectivo de su negocio',
+        'profit_loss'           => 'Ingresos y gastos, incluidas las facturas de venta y de compra pendientes',
+        'expenses_by_category'  => 'Principales gastos de las distintas categorías',
+        'account_balance'       => 'Saldo actual de sus cuentas bancarias',
+        'bank_feeds'            => 'Importe automáticamente sus transacciones a Akaunting <br />conectando sus cuentas bancarias',
+    ],
+
+    'periods' => [
+        'overdue_1_30'          => 'Vencido hace 1-30 días',
+        'overdue_31_60'         => 'Vencido hace 31-60 días',
+        'overdue_61_90'         => 'Vencido hace 61-90 días',
+        'overdue_91_un'         => 'Vencido hace más de 90 días',
+    ],
 ];

@@ -14,7 +14,7 @@ class Currency extends FormRequest
     public function rules()
     {
         // Check if store or update
-        if ($this->getMethod() == 'PATCH') {
+        if (in_array($this->getMethod(), ['PATCH', 'PUT'])) {
             $id = is_numeric($this->currency) ? $this->currency : $this->currency->getAttribute('id');
         } else {
             $id = null;
@@ -25,12 +25,13 @@ class Currency extends FormRequest
 
         return [
             'name' => 'required|string',
-            'code' => 'required|string|unique:currencies,NULL,' . $id . ',id,company_id,' . $company_id . ',deleted_at,NULL',
+            'code' => 'required|string|currency_code|unique:currencies,NULL,' . ($id ?? 'null') . ',id,company_id,' . $company_id . ',deleted_at,NULL',
             'rate' => 'required|gt:0',
             'enabled' => 'integer|boolean',
-            'default_currency' => 'boolean',
+            'default_currency' => 'nullable|boolean',
+            'decimal_mark' => 'nullable|string|different:thousands_separator|regex:/^[A-Za-z.,_\s-]+$/',
             'symbol_first' => 'nullable|boolean',
-            'thousands_separator' => 'different:decimal_mark',
+            'thousands_separator' => 'nullable|different:decimal_mark|regex:/^[A-Za-z.,_\s-]+$/',
         ];
     }
 }

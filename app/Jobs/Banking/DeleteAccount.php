@@ -3,6 +3,9 @@
 namespace App\Jobs\Banking;
 
 use App\Abstracts\Job;
+use App\Events\Banking\AccountDeleting;
+use App\Events\Banking\AccountDeleted;
+use App\Exceptions\Job\NotAllowed;
 use App\Interfaces\Job\ShouldDelete;
 
 class DeleteAccount extends Job implements ShouldDelete
@@ -11,9 +14,13 @@ class DeleteAccount extends Job implements ShouldDelete
     {
         $this->authorize();
 
+        event(new AccountDeleting($this->model));
+
         \DB::transaction(function () {
             $this->model->delete();
         });
+
+        event(new AccountDeleted($this->model));
 
         return true;
     }
@@ -26,7 +33,7 @@ class DeleteAccount extends Job implements ShouldDelete
         if ($relationships = $this->getRelationships()) {
             $message = trans('messages.warning.deleted', ['name' => $this->model->name, 'text' => implode(', ', $relationships)]);
 
-            throw new \Exception($message);
+            throw new NotAllowed($message);
         }
     }
 
@@ -34,11 +41,12 @@ class DeleteAccount extends Job implements ShouldDelete
     {
         $rels = [
             'transactions' => 'transactions',
+            'reconciliations' => 'reconciliations',
         ];
 
         $relationships = $this->countRelationships($this->model, $rels);
 
-        if ($this->model->id == setting('default.account')) {
+        if ((int) $this->model->id === (int) setting('default.account')) {
             $relationships[] = strtolower(trans_choice('general.companies', 1));
         }
 

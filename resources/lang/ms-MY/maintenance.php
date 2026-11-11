@@ -2,8 +2,10 @@
 
 return [
 
-    'title' => 'Dibawah penyelenggaraan',
+    'title' => 'Dalam Penyelenggaraan',
 
-    'message' => 'Harap maaf, perkhidmatan kami tergendala seketika bagi tujuan penyelenggaraan. Sila cuba sebentar lagi!',
+    'message' => 'Maaf, kami sedang dalam penyelenggaraan. Sila cuba semula kemudian!',
+
+    'read_only' => 'Mod baca sahaja diaktifkan. Anda dibenarkan untuk melihat tetapi tidak menukar apa-apa!',
 
 ];

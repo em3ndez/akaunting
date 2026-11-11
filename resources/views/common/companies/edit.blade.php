@@ -1,62 +1,49 @@
-@extends('layouts.admin')
+<x-layouts.admin>
+    <x-slot name="title">{{ trans('general.title.edit', ['type' => trans_choice('general.companies', 1)]) }}</x-slot>
 
-@section('title', trans('general.title.edit', ['type' => trans_choice('general.companies', 1)]))
+    <x-slot name="content">
+        <x-form.container>
+            <x-form id="company" method="PATCH" :route="['companies.update', $company->id]" :model="$company">
+                @if (! empty(setting('company.country')))
+                    <x-alert.warning message="{{ trans('companies.error.country_immutable') }}" />
+                @else
+                    <x-alert.warning message="{{ trans('companies.country_warning') }}" />
+                @endif
 
-@section('content')
-    <div class="card">
-        {!! Form::model($company, [
-            'id' => 'company',
-            'method' => 'PATCH',
-            'route' => ['companies.update', $company->id],
-            '@submit.prevent' => 'onSubmit',
-            '@keydown' => 'form.errors.clear($event.target.name)',
-            'files' => true,
-            'role' => 'form',
-            'class' => 'form-loading-button',
-            'novalidate' => true
-        ]) !!}
+                <x-form.section>
+                    <x-slot name="head">
+                        <x-form.section.head title="{{ trans('general.general') }}" description="{{ trans('companies.form_description.general') }}" />
+                    </x-slot>
 
-            <div class="card-body">
-                <div class="row">
-                    {{ Form::textGroup('name', trans('general.name'), 'font') }}
+                    <x-slot name="body">
+                        <x-form.group.text name="name" label="{{ trans('general.name') }}" />
 
-                    {{ Form::emailGroup('email', trans('general.email'), 'envelope') }}
+                        <x-form.group.email name="email" label="{{ trans('general.email') }}" />
 
-                    {{ Form::selectGroup('currency', trans_choice('general.currencies', 1), 'exchange-alt', $currencies, $company->currency ?? 'USD') }}
+                        <x-form.group.currency name="currency" :options="$currencies" selected="{{ ! empty($company->currency) ? $company->currency : config('setting.fallback.default.currency') }}" without-add-new />
 
-                    {{ Form::selectGroup('locale', trans_choice('general.languages', 1), 'flag', language()->allowed(), $company->locale ?? config('app.locale', 'en-GB'), []) }}
+                        <x-form.group.country disabled="{{ ! empty(setting('company.country')) }}" :selected="setting('company.country')" />
+                    </x-slot>
+                </x-form.section>
 
-                    {{ Form::textGroup('tax_number', trans('general.tax_number'), 'percent', [], $company->tax_number) }}
+                <x-form.group.switch name="enabled" label="{{ trans('general.enabled') }}" />
 
-                    {{ Form::textGroup('phone', trans('settings.company.phone'), 'phone', [], $company->phone) }}
+                @can('update-common-companies')
+                <x-form.section>
+                    <x-slot name="foot">
+                        <x-form.buttons cancel-route="companies.index" />
+                    </x-slot>
+                </x-form.section>
+                @endcan
+            </x-form>
+        </x-form.container>
+    </x-slot>
 
-                    {{ Form::textareaGroup('address', trans('general.address'), '', $company->address, ['rows' => '2', 'v-model' => 'form.address']) }}
+    @push('scripts_end')
+        <script type="text/javascript">
+            var country_validation_required_message = "{{ trans('validation.required', ['attribute' => trans_choice('general.countries', 1)]) }}";
+        </script>
+    @endpush
 
-                    {{ Form::textGroup('city', trans_choice('general.cities', 1), 'city', []) }}
-
-                    {{ Form::textGroup('zip_code', trans('general.zip_code'), 'mail-bulk', []) }}
-
-                    {{ Form::textGroup('state', trans('general.state'), 'city', []) }}
-
-                    {{ Form::selectGroup('country', trans_choice('general.countries', 1), 'globe-americas', trans('countries'), $company->country, ['model' => 'form.country']) }}
-
-                    {{ Form::fileGroup('logo', trans('companies.logo'), '', ['dropzone-class' => 'form-file'], $company->company_logo) }}
-
-                    {{ Form::radioGroup('enabled', trans('general.enabled'), $company->enabled) }}
-                </div>
-            </div>
-
-            @can('update-common-companies')
-                <div class="card-footer">
-                    <div class="row save-buttons">
-                        {{ Form::saveButtons('companies.index') }}
-                    </div>
-                </div>
-            @endcan
-        {!! Form::close() !!}
-    </div>
-@endsection
-
-@push('scripts_start')
-    <script src="{{ asset('public/js/common/companies.js?v=' . version('short')) }}"></script>
-@endpush
+    <x-script folder="common" file="companies" />
+</x-layouts.admin>

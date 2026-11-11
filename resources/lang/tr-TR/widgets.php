@@ -2,23 +2,33 @@
 
 return [
 
-    'currencies'                => 'Para Birimleri',
-    'total_income'              => 'Toplam Gelir',
     'receivables'               => 'Alacak',
-    'open_invoices'             => 'Açık Faturalar',
-    'overdue_invoices'          => 'Gecikmiş Faturalar',
-    'total_expenses'            => 'Toplam Gider',
     'payables'                  => 'Verecek',
-    'open_bills'                => 'Açık Faturalar',
-    'overdue_bills'             => 'Gecikmiş Faturalar',
-    'total_profit'              => 'Toplam Kar',
-    'open_profit'               => 'Açık Kar',
-    'overdue_profit'            => 'Gecikmiş Kar',
     'cash_flow'                 => 'Nakit Akışı',
-    'no_profit_loss'            => 'Kar-Zarar Yok',
-    'income_by_category'        => 'Gelir Kategorileri',
+    'profit_loss'               => 'Kar & Zarar',
     'expenses_by_category'      => 'Gider Kategorileri',
     'account_balance'           => 'Hesap Bakiyesi',
-    'latest_income'             => 'Son Gelirler',
-    'latest_expenses'           => 'Son Giderler',
+    'bank_feeds'                => 'Banka Hesaplarını Bağla',
+    'currencies'                => 'Para Birimleri',
+
+    'view_report'               => 'Raporu Görüntüle',
+    'total_unpaid_invoices'     => 'Toplam ödenmemiş satış faturaları',
+    'total_unpaid_bills'        => 'Toplam ödenmemiş satın alma faturaları',
+
+    'description' => [
+        'receivables'           => 'Henüz müşterilerinizden almadığınız tutar',
+        'payables'              => 'Henüz tedarikçilerinize ödemediğiniz tutar',
+        'cash_flow'             => 'İşletmenize giren ve çıkan nakit',
+        'profit_loss'           => 'Ödenmemiş faturalar dahil gelir ve giderler',
+        'expenses_by_category'  => 'Çeşitli kategorilerdeki en yüksek giderler',
+        'account_balance'       => 'Banka hesaplarınızın mevcut bakiyesi',
+        'bank_feeds'            => 'Banka hesaplarınızı bağlayarak işlemlerinizi Akaunting\'e otomatik olarak aktarın <br />',
+    ],
+
+    'periods' => [
+        'overdue_1_30'          => '1-30 gün gecikmiş',
+        'overdue_31_60'         => '31-60 gün gecikmiş',
+        'overdue_61_90'         => '61-90 gün gecikmiş',
+        'overdue_91_un'         => '> 90 gün gecikmiş',
+    ],
 ];
